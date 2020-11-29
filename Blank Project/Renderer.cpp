@@ -1,17 +1,17 @@
 #include "Renderer.h"
 #include "../nclgl/CubeRobot.h"
 
-const int POST_PASSES = 1;
-const int NO_SCRAPERS = 5;
+const int POST_PASSES = 0;
+const int NO_SCRAPERS = 60;
 
-Renderer::Renderer(Window &parent) : OGLRenderer(parent)	
+Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 {
 	quad = Mesh::GenerateQuad();
-	heightMap = new HeightMap(TEXTUREDIR "noise10.png");
+	heightMap = new HeightMap(TEXTUREDIR "noise12.png");
 
 	building1 = Mesh::LoadFromMeshFile("OffsetCubeY.msh");
 	building2 = Mesh::LoadFromMeshFile("cylinder.msh");
-	
+
 	skyboxShader = new Shader("skyboxVertex.glsl", "skyboxFragment.glsl");
 
 	reflectShader = new Shader("reflectVertex.glsl", "reflectFragment.glsl");
@@ -22,7 +22,9 @@ Renderer::Renderer(Window &parent) : OGLRenderer(parent)
 
 	processShader = new Shader("TexturedVertex.glsl", "processfrag.glsl");
 
-	walltexture1 = SOIL_load_OGL_texture(TEXTUREDIR "scraper2.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
+	walltexture[0] = SOIL_load_OGL_texture(TEXTUREDIR "scraper.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
+	walltexture[1] = SOIL_load_OGL_texture(TEXTUREDIR "scraper2.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
+	walltexture[2] = SOIL_load_OGL_texture(TEXTUREDIR "scraper3.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
 
 	wallBump1 = SOIL_load_OGL_texture(
 		TEXTUREDIR "ScraperBump2.png", SOIL_LOAD_AUTO,
@@ -48,7 +50,15 @@ Renderer::Renderer(Window &parent) : OGLRenderer(parent)
 		TEXTUREDIR "sidewalk.png", SOIL_LOAD_AUTO,
 		SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
 
-	SetTextureRepeating(walltexture1, true);
+	waterTex = SOIL_load_OGL_texture(
+		TEXTUREDIR "water.TGA", SOIL_LOAD_AUTO,
+		SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
+
+	for (int i = 0; i < 3; i++)
+	{
+		SetTextureRepeating(walltexture[i], true);
+	}
+	
 	SetTextureRepeating(wallBump1, true);
 
 	SetTextureRepeating(earthTex, true);
@@ -213,6 +223,7 @@ void Renderer::DrawScene()
 	projMatrix = Matrix4::Perspective(1.0f, 15000.0f, (float)width / (float)height, 90.0f);
 	DrawSkybox();
 	DrawNodes();
+	DrawWater();
 
 
 	ClearNodeLists();
@@ -261,6 +272,8 @@ void Renderer::DrawNode(SceneNode* n)
 		texture = n->GetTexture();
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 		if (n->GetBumpTexture())
 		{
@@ -297,8 +310,8 @@ void Renderer::placeTerrain()
 
 	camera = new Camera(0, -90.f, heightmapSize * Vector3(0.05, 0.5f, 0.5));
 
-	light = new Light(Vector3(0, 0, 100.0f), Vector4(1, 0.75, 1, 1), 5000.0f);
-	light->SetPosition(heightmapSize * Vector3(0, 0, 0.5));
+	light = new Light(Vector3(0, 0, 100.0f), Vector4(1, 0.75, 1, 1), 1000.0f);
+	light->SetPosition(heightmapSize * Vector3(0.1, 0.2, 0.5));
 
 	//road
 	for (int i = 0; i < 11; i++)
@@ -307,7 +320,7 @@ void Renderer::placeTerrain()
 		s->SetModelScale(Vector3(120.0f, 300.0f, 200.0f));
 		s->SetTransform(Matrix4::Translation(Vector3(0.5, 1.01, 0.1)));
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0, 0 + 0.09 * i)));
+		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0.07, 0 + 0.09 * i)));
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
 		s->SetTexture(roadTexture);
 		s->SetBumpTexture(roadBump);
@@ -323,7 +336,7 @@ void Renderer::placeTerrain()
 		s->SetModelScale(Vector3(150.0f, 300.0f, 100.0f));
 		s->SetTransform(Matrix4::Translation(Vector3(0.5, 0.95, 0.1)));
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0, 0 + 0.09 * i)));
+		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0.069, 0 + 0.09 * i)));
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
 		s->SetTexture(pavedTexture);
 		s->SetBumpTexture(NULL);
@@ -332,23 +345,23 @@ void Renderer::placeTerrain()
 		Scenery->AddChild(s);
 	}
 
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < 10; i++)
 	{
 		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
-		r->SetModelScale(Vector3(100.0f, 300.0f, 1000.0f));
-		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0, 0, 0.16 + 0.31 * i)));
+		r->SetModelScale(Vector3(100.0f, 300.0f, 1100.0f));
+		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0, 0, -1 + 0.34 * i)));
 
-		r->SetTexture(walltexture1);
+		r->SetTexture(walltexture[1]);
 		r->SetBumpTexture(wallBump1);
 		r->SetShader(lightShader);
 		r->SetBoundingRadius(10000.0f);
 		root->AddChild(r);
 	}
 
-	SceneNode* tunnel = new SceneNode(quad, Vector4(1, 1, 1, 1));
-	tunnel->SetModelScale(Vector3(120.0f, 120.0f, 120.0f));
+	SceneNode* tunnel = new SceneNode(building1, Vector4(1, 1, 1, 1));
+	tunnel->SetModelScale(Vector3(120.0f, 120.0f, 50.0f));
 
-	tunnel->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0.1, 0.05, 0.5)));
+	tunnel->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0, 0, 0.5)));
 	tunnel->SetTransform(tunnel->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
 	tunnel->SetTexture(earthTex);
 	tunnel->SetBumpTexture(earthBump);
@@ -356,19 +369,45 @@ void Renderer::placeTerrain()
 	tunnel->SetBoundingRadius(10000.0f);
 	root->AddChild(tunnel);
 
-	//for (int i = 0; i < NO_SCRAPERS; i++)
-	//{
-	//	SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
-	//	r->SetModelScale(Vector3(100.0f, 300.0f, 100.0f));
-	//	r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(-0.01 , 0, 0 + 0.05 * i )));
-	//	
-	//	r->SetTexture(walltexture1);
-	//	r->SetBumpTexture(wallBump1);
-	//	r->SetShader(lightShader);
-	//	r->SetBoundingRadius(10000.0f);
-	//	root->AddChild(r);
+	for (int i = 0; i < NO_SCRAPERS; i++)
+	{
+		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
+		r->SetModelScale(Vector3(100.0f, rand() % (int)500 + 300, rand() % (int)50 + 100.0f));
+		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(-0.05 , 0.6, -1 + 0.05 * i )));
+		
+		r->SetTexture(walltexture[rand()% 3]);
+		r->SetBumpTexture(wallBump1);
+		r->SetShader(lightShader);
+		r->SetBoundingRadius(10000.0f);
+		root->AddChild(r);
 
-	//}
+	}
+	for (int i = 0; i < NO_SCRAPERS; i++)
+	{
+		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
+		r->SetModelScale(Vector3(100.0f, rand() % (int)500 + 600, rand() % (int)50 + 100.0f));
+		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(-0.2, 0.6, -1 + 0.05 * i)));
+
+		r->SetTexture(walltexture[rand() % 3]);
+		r->SetBumpTexture(wallBump1);
+		r->SetShader(lightShader);
+		r->SetBoundingRadius(10000.0f);
+		root->AddChild(r);
+
+	}
+	for (int i = 0; i < NO_SCRAPERS; i++)
+	{
+		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
+		r->SetModelScale(Vector3(100.0f, rand() % (int)500 + 900, rand() % (int)50 + 100.0f));
+		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(-0.4, 0.6, -1 + 0.05 * i)));
+
+		r->SetTexture(walltexture[rand() % 3]);
+		r->SetBumpTexture(wallBump1);
+		r->SetShader(lightShader);
+		r->SetBoundingRadius(10000.0f);
+		root->AddChild(r);
+
+	}
 	root->AddChild(Scenery);
 
 }
@@ -422,4 +461,37 @@ void Renderer::PresentScene()
 	glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
 	glUniform1i(glGetUniformLocation(sceneShader->GetProgram(), "diffuseTex"), 0);
 	quad->Draw();
+}
+
+void Renderer::DrawWater()
+{
+	BindShader(reflectShader);
+
+	glUniform3fv(glGetUniformLocation(reflectShader->GetProgram(),
+		"cameraPos"), 1, (float*)&camera->GetPosition());
+
+	glUniform1i(glGetUniformLocation(
+		reflectShader->GetProgram(), "diffuseTex"), 0);
+	glUniform1i(glGetUniformLocation(
+		reflectShader->GetProgram(), "cubeTex"), 2);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, waterTex);
+
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cubeMap);
+	Vector3 hSize = heightMap->GetHeightmapSize();
+
+	modelMatrix =
+		Matrix4::Translation(hSize * Vector3(1, 0.01, 0.5)) *Matrix4::Scale(hSize * 0.5f) *Matrix4::Rotation(90, Vector3(1, 0, 0));
+
+	/*textureMatrix =
+		Matrix4::Translation(Vector3(waterCycle, 0.0f, waterCycle)) *
+		Matrix4::Scale(Vector3(10, 10, 10)) *
+		Matrix4::Rotation(waterRotate, Vector3(0, 0, 1));*/
+
+	UpdateShaderMatrices();
+	SetShaderLight(*light);
+	quad->Draw();
+
 }

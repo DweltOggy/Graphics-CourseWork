@@ -18,6 +18,7 @@ public:
 protected:
 	void placeTerrain();
 	void DrawSkybox(); 
+	void DrawWater();
 
 	void PresentScene();
 	void DrawPostProcess();
@@ -58,11 +59,7 @@ protected:
 
 	GLuint pavedTexture;
 
-	GLuint walltexture1;
-	GLuint walltexture2;
-	GLuint walltexture3;
-	GLuint walltexture4;
-	GLuint walltexture5;
+	GLuint walltexture[3];
 
 	GLuint wallBump1;
 
