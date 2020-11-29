@@ -59,6 +59,11 @@ protected:
 	GLuint pavedTexture;
 
 	GLuint walltexture1;
+	GLuint walltexture2;
+	GLuint walltexture3;
+	GLuint walltexture4;
+	GLuint walltexture5;
+
 	GLuint wallBump1;
 
 	GLuint bufferFBO;

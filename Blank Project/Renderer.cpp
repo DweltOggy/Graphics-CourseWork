@@ -2,11 +2,12 @@
 #include "../nclgl/CubeRobot.h"
 
 const int POST_PASSES = 1;
+const int NO_SCRAPERS = 5;
 
 Renderer::Renderer(Window &parent) : OGLRenderer(parent)	
 {
 	quad = Mesh::GenerateQuad();
-	heightMap = new HeightMap(TEXTUREDIR "noise9.png");
+	heightMap = new HeightMap(TEXTUREDIR "noise10.png");
 
 	building1 = Mesh::LoadFromMeshFile("OffsetCubeY.msh");
 	building2 = Mesh::LoadFromMeshFile("cylinder.msh");
@@ -64,8 +65,7 @@ Renderer::Renderer(Window &parent) : OGLRenderer(parent)
 		TEXTUREDIR "sunwave_south.jpg", TEXTUREDIR "sunwave_north.jpg",
 		SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
 
-	camera = new Camera(0, -90.f, Vector3(0, 25.0f, 0));//-45.0f, 0.0f,heightmapSize * Vector3(0.5f, 5.0f, 0.5f)
-	light = new Light(Vector3(3000.0f,1000.0f, 0.0f), Vector4(1, 0.75, 1, 1), 5000.0f);
+	
 
 	projMatrix = Matrix4::Perspective(1.0f, 15000.0f,(float)width / (float)height, 90.0f);
 
@@ -287,59 +287,90 @@ void Renderer::placeTerrain()
 
 	SceneNode* Scenery = new SceneNode(heightMap, Vector4(1, 0, 1, 1));
 
-	float terrainsize = heightMap->GetHeightmapSize().Length() * 15.0f;
-	//R->SetTransform(Matrix4::Rotation(90.0f,Vector3(0, 1, 0)));
-
-	Scenery->SetModelScale(Vector3(15.0f, 15.0f, 15.0f));
-
-	Scenery->SetTransform(Scenery->GetTransform() * Matrix4::Translation(Vector3(-150.0f, 0.0f, -4500.0f)));
+	float terrainsize = heightMap->GetHeightmapSize().Length() * 5.0f;
 	Scenery->SetTexture(earthTex);
 	Scenery->SetBumpTexture(earthBump);
 	Scenery->SetShader(lightShader);
 	Scenery->SetBoundingRadius(terrainsize);
 
-	root->AddChild(Scenery);
+	Vector3 heightmapSize = heightMap->GetHeightmapSize();
+
+	camera = new Camera(0, -90.f, heightmapSize * Vector3(0.05, 0.5f, 0.5));
+
+	light = new Light(Vector3(0, 0, 100.0f), Vector4(1, 0.75, 1, 1), 5000.0f);
+	light->SetPosition(heightmapSize * Vector3(0, 0, 0.5));
 
 	//road
-	for (int i = 0; i < 15; i++)
+	for (int i = 0; i < 11; i++)
 	{
 		SceneNode* s = new SceneNode(quad, Vector4(1, 1, 1, 1));
 		s->SetModelScale(Vector3(120.0f, 300.0f, 200.0f));
 		s->SetTransform(Matrix4::Translation(Vector3(0.5, 1.01, 0.1)));
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-		s->SetTransform(s->GetTransform() * Matrix4::Translation(Vector3(0, 0, 100.0f + 600 * i)));
+		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0, 0 + 0.09 * i)));
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
 		s->SetTexture(roadTexture);
 		s->SetBumpTexture(roadBump);
 		s->SetShader(lightShader);
 		s->SetBoundingRadius(10000.0f);
-		root->AddChild(s);
+		Scenery->AddChild(s);
 	}
 
 	//pavement
-	for (int i = 0; i < 15; i++)
+	for (int i = 0; i < 11; i++)
 	{
 		SceneNode* s = new SceneNode(quad, Vector4(1, 1, 1, 1));
 		s->SetModelScale(Vector3(150.0f, 300.0f, 100.0f));
 		s->SetTransform(Matrix4::Translation(Vector3(0.5, 0.95, 0.1)));
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-		s->SetTransform(s->GetTransform() * Matrix4::Translation(Vector3(0, -0.2f, 100.0f + 600 * i)));
+		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0, 0 + 0.09 * i)));
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
 		s->SetTexture(pavedTexture);
 		s->SetBumpTexture(NULL);
 		s->SetShader(lightShader);
 		s->SetBoundingRadius(10000.0f);
-		root->AddChild(s);
+		Scenery->AddChild(s);
 	}
 
-	//SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
-	//r->SetModelScale(Vector3(100.0f, 300.0f, 100.0f));
-	//r->SetTransform(Matrix4::Translation(Vector3(0, 0, 250.0f)));
-	//r->SetTexture(walltexture1);
-	//r->SetBumpTexture(wallBump1);
-	//r->SetShader(lightShader);
-	//r->SetBoundingRadius(10000.0f);
-	//root->AddChild(r);
+	for (int i = 0; i < 3; i++)
+	{
+		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
+		r->SetModelScale(Vector3(100.0f, 300.0f, 1000.0f));
+		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0, 0, 0.16 + 0.31 * i)));
+
+		r->SetTexture(walltexture1);
+		r->SetBumpTexture(wallBump1);
+		r->SetShader(lightShader);
+		r->SetBoundingRadius(10000.0f);
+		root->AddChild(r);
+	}
+
+	SceneNode* tunnel = new SceneNode(quad, Vector4(1, 1, 1, 1));
+	tunnel->SetModelScale(Vector3(120.0f, 120.0f, 120.0f));
+
+	tunnel->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0.1, 0.05, 0.5)));
+	tunnel->SetTransform(tunnel->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+	tunnel->SetTexture(earthTex);
+	tunnel->SetBumpTexture(earthBump);
+	tunnel->SetShader(lightShader);
+	tunnel->SetBoundingRadius(10000.0f);
+	root->AddChild(tunnel);
+
+	//for (int i = 0; i < NO_SCRAPERS; i++)
+	//{
+	//	SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
+	//	r->SetModelScale(Vector3(100.0f, 300.0f, 100.0f));
+	//	r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(-0.01 , 0, 0 + 0.05 * i )));
+	//	
+	//	r->SetTexture(walltexture1);
+	//	r->SetBumpTexture(wallBump1);
+	//	r->SetShader(lightShader);
+	//	r->SetBoundingRadius(10000.0f);
+	//	root->AddChild(r);
+
+	//}
+	root->AddChild(Scenery);
+
 }
 
 void Renderer::DrawPostProcess()
