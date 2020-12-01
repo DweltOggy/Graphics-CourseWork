@@ -118,6 +118,7 @@ void Renderer::DrawHeightmap()
 	
 	glUniform1i(glGetUniformLocation(
 		lightShader -> GetProgram(), "diffuseTex"), 0);
+
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, earthTex);
 	

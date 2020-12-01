@@ -1,8 +1,11 @@
 #include "Renderer.h"
+#include "Artifact.h"
 #include "../nclgl/CubeRobot.h"
 
 const int POST_PASSES = 0;
 const int NO_SCRAPERS = 60;
+const int NO_ART = 10;
+const int NO_LIGHTS = 5;
 
 Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 {
@@ -10,7 +13,7 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 	heightMap = new HeightMap(TEXTUREDIR "noise12.png");
 
 	building1 = Mesh::LoadFromMeshFile("OffsetCubeY.msh");
-	building2 = Mesh::LoadFromMeshFile("cylinder.msh");
+	cube = Mesh::LoadFromMeshFile("Cube.msh");
 
 	skyboxShader = new Shader("skyboxVertex.glsl", "skyboxFragment.glsl");
 
@@ -22,16 +25,23 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 
 	processShader = new Shader("TexturedVertex.glsl", "processfrag.glsl");
 
+	//wireFrameShader = new Shader("#COwireVertex.glsl", "#COwireFrag.glsl", "#COwireGeometry.glsl");
+
+
+
 	walltexture[0] = SOIL_load_OGL_texture(TEXTUREDIR "scraper.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
 	walltexture[1] = SOIL_load_OGL_texture(TEXTUREDIR "scraper2.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
 	walltexture[2] = SOIL_load_OGL_texture(TEXTUREDIR "scraper3.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
+
+	blockadeTex = SOIL_load_OGL_texture(TEXTUREDIR "rustyWall.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
+
 
 	wallBump1 = SOIL_load_OGL_texture(
 		TEXTUREDIR "ScraperBump2.png", SOIL_LOAD_AUTO,
 		SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
 
 	earthTex = SOIL_load_OGL_texture(
-		TEXTUREDIR "Brushed_Metal2.png", SOIL_LOAD_AUTO,
+		TEXTUREDIR "Purple.jpg", SOIL_LOAD_AUTO,
 		SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
 
 	earthBump = SOIL_load_OGL_texture(
@@ -59,6 +69,7 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		SetTextureRepeating(walltexture[i], true);
 	}
 	
+	SetTextureRepeating(blockadeTex, true);
 	SetTextureRepeating(wallBump1, true);
 
 	SetTextureRepeating(earthTex, true);
@@ -105,8 +116,8 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 
 	}
 
-	glGenFramebuffers(1, &bufferFBO); // We ’ll render the scene into this
-	glGenFramebuffers(1, &processFBO); // And do post processing in this
+	glGenFramebuffers(1, &bufferFBO); 
+	glGenFramebuffers(1, &processFBO); 
 
 	glBindFramebuffer(GL_FRAMEBUFFER, bufferFBO);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
@@ -115,7 +126,7 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		GL_TEXTURE_2D, bufferDepthTex, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
 		GL_TEXTURE_2D, bufferColourTex[0], 0);
-	// We can check FBO attachment success using this command !
+
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE || !bufferDepthTex || !bufferColourTex[0])
 	{
 		return;
@@ -131,15 +142,20 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 
 	init = true;
 }
+
 Renderer::~Renderer(void)	
 {
 	delete camera;
 	delete quad;
+	delete cube;
 	delete building1;
 	delete skyboxShader;
 	delete lightShader;
 	delete reflectShader;
-	delete light;
+	//delete wireFrameShader;
+
+	delete lights;
+
 	delete heightMap;
 	delete sceneShader;
 	delete processShader;
@@ -154,6 +170,7 @@ Renderer::~Renderer(void)
 void Renderer::UpdateScene(float dt) 
 {
 	camera->UpdateCamera(dt);
+	//camera->
 	viewMatrix = camera->BuildViewMatrix();
 	frameFrustum.FromMatrix(projMatrix * viewMatrix);
 
@@ -254,7 +271,7 @@ void Renderer::DrawNode(SceneNode* n)
 	if (n->GetShader())
 	{	
 		BindShader(n->GetShader());
-		SetShaderLight(*light);
+		SetShaderLight(lights[0]);
 		UpdateShaderMatrices();
 		
 	}
@@ -262,18 +279,26 @@ void Renderer::DrawNode(SceneNode* n)
 	if (n->GetMesh())
 	{
 	
+
+		glUniform3fv(glGetUniformLocation(lightShader->GetProgram(),
+			"cameraPos"), 1, (float*)&camera->GetPosition());
+
 		glUniform1i(glGetUniformLocation(n->GetShader()->GetProgram(), "diffuseTex"), 0);
-
-		Matrix4 model = n->GetWorldTransform() * Matrix4::Scale(n->GetModelScale());
-		glUniformMatrix4fv(glGetUniformLocation(n->GetShader()->GetProgram(), "modelMatrix"), 1, false, model.values);
-
-		glUniform4fv(glGetUniformLocation(n->GetShader()->GetProgram(), "nodeColour"), 1, (float*)&n->GetColour());
 
 		texture = n->GetTexture();
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, texture);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+
+		Matrix4 model = n->GetWorldTransform() * Matrix4::Scale(n->GetModelScale());
+		glUniformMatrix4fv(glGetUniformLocation(n->GetShader()->GetProgram(), "modelMatrix"), 1, false, model.values);
+
+		//glUniform4fv(glGetUniformLocation(n->GetShader()->GetProgram(), "nodeColour"), 1, (float*)&n->GetColour());
+
+
+
 
 		if (n->GetBumpTexture())
 		{
@@ -284,6 +309,9 @@ void Renderer::DrawNode(SceneNode* n)
 		}
 
 		glUniform1i(glGetUniformLocation(n->GetShader()->GetProgram(), "useTexture"), texture);
+
+		modelMatrix.ToIdentity();
+		textureMatrix.ToIdentity();
 
 		n->Draw(*this);
 
@@ -296,7 +324,7 @@ void Renderer::placeTerrain()
 
 	root = new SceneNode();
 	root->SetShader(NULL);
-	root->SetBoundingRadius(10000.0f);
+	//root->SetBoundingRadius(10000.0f);
 
 	SceneNode* Scenery = new SceneNode(heightMap, Vector4(1, 0, 1, 1));
 
@@ -306,26 +334,33 @@ void Renderer::placeTerrain()
 	Scenery->SetShader(lightShader);
 	Scenery->SetBoundingRadius(terrainsize);
 
+	//SceneNode* WireScenery = new SceneNode(heightMap, Vector4(1, 0, 1, 1));
+	//WireScenery->SetTexture(earthTex);
+	//WireScenery->SetBumpTexture(earthBump);
+	//WireScenery->SetShader(lightShader);
+	//WireScenery->SetBoundingRadius(terrainsize);
 	Vector3 heightmapSize = heightMap->GetHeightmapSize();
-
+	
 	camera = new Camera(0, -90.f, heightmapSize * Vector3(0.05, 0.5f, 0.5));
 
-	light = new Light(Vector3(0, 0, 100.0f), Vector4(1, 0.75, 1, 1), 1000.0f);
-	light->SetPosition(heightmapSize * Vector3(0.1, 0.2, 0.5));
+	//lights = new Light[NO_LIGHTS];
+
+	lights = new Light(Vector3(0, 0, 100.0f), Vector4(1, 0.75, 1, 1), 1000.0f);
+	lights->SetPosition(heightmapSize * Vector3(0.1, 0.2, 0.5));
 
 	//road
 	for (int i = 0; i < 11; i++)
 	{
 		SceneNode* s = new SceneNode(quad, Vector4(1, 1, 1, 1));
 		s->SetModelScale(Vector3(120.0f, 300.0f, 200.0f));
-		s->SetTransform(Matrix4::Translation(Vector3(0.5, 1.01, 0.1)));
+		s->SetTransform(Matrix4::Translation(Vector3(0, 1.01, 0.1)));
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
 		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0.07, 0 + 0.09 * i)));
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
 		s->SetTexture(roadTexture);
 		s->SetBumpTexture(roadBump);
 		s->SetShader(lightShader);
-		s->SetBoundingRadius(10000.0f);
+		s->SetBoundingRadius(5000.0f);
 		Scenery->AddChild(s);
 	}
 
@@ -368,6 +403,19 @@ void Renderer::placeTerrain()
 	tunnel->SetShader(lightShader);
 	tunnel->SetBoundingRadius(10000.0f);
 	root->AddChild(tunnel);
+
+	for (int i = 0; i < NO_ART; i++)
+	{
+		Artifact* s = new Artifact();
+		float x = 0.1 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (2.0 - 0.1)));
+		float y = 0.5 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (8.0 - 0.5)));
+		float z = -0.5 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 1.5));
+		s->SetTransform(Matrix4::Translation(heightmapSize * Vector3(x, y, z)));
+		s->SetShader(NULL);
+		s->setCube(building1, earthTex, lightShader);
+		Scenery->AddChild(s);
+	}
+
 
 	for (int i = 0; i < NO_SCRAPERS; i++)
 	{
@@ -491,7 +539,7 @@ void Renderer::DrawWater()
 		Matrix4::Rotation(waterRotate, Vector3(0, 0, 1));*/
 
 	UpdateShaderMatrices();
-	SetShaderLight(*light);
+	SetShaderLight(*lights);
 	quad->Draw();
 
 }

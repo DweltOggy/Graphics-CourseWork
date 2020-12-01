@@ -1,10 +1,10 @@
 #include "CubeRobot.h"
 
-CubeRobot::CubeRobot(Mesh * mesh) 
+CubeRobot::CubeRobot(Mesh* mesh) 
 {
 	 // SetMesh ( cube ); // Uncomment if you want a local origin marker !
 		
-	SceneNode * body = new SceneNode(mesh, Vector4(1, 0, 0, 1)); // Red !
+	SceneNode* body = new SceneNode(mesh, Vector4(1, 0, 0, 1)); // Red !
 	body -> SetModelScale(Vector3(10, 15, 5));
 	body -> SetTransform(Matrix4::Translation(Vector3(0, 35, 0)));
 	AddChild(body);
@@ -26,17 +26,16 @@ CubeRobot::CubeRobot(Mesh * mesh)
 	
 
 
-	hips = new SceneNode(NULL, Vector4(0, 0, 1, 1)); 
-	//rightLeg->SetModelScale(Vector3(3, -17.5, 3));
+	hips = new SceneNode(NULL, Vector4(0, 0, 1, 1));
 	hips->SetTransform(Matrix4::Translation(Vector3(0, 0, 0)));
 	body->AddChild(hips);
 
-	SceneNode * leftLeg = new SceneNode(mesh, Vector4(0, 0, 1, 1)); // Blue !
+	SceneNode* leftLeg = new SceneNode(mesh, Vector4(0, 0, 1, 1)); // Blue !
 	leftLeg -> SetModelScale(Vector3(3, -17.5, 3));
 	leftLeg -> SetTransform(Matrix4::Translation(Vector3(-8, 0, 0)));
 	hips -> AddChild(leftLeg);
 	
-	SceneNode * rightLeg = new SceneNode(mesh, Vector4(0, 0, 1, 1)); // Blue !
+	SceneNode* rightLeg = new SceneNode(mesh, Vector4(0, 0, 1, 1)); // Blue !
 	rightLeg -> SetModelScale(Vector3(3, -17.5, 3));
 	rightLeg -> SetTransform(Matrix4::Translation(Vector3(8, 0, 0)));
 	hips -> AddChild(rightLeg);

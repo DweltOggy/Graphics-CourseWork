@@ -35,18 +35,27 @@ protected:
 	Shader* sceneShader;
 	Shader* skyboxShader;
 	Shader* reflectShader;
-	Shader* processShader;
+	Shader* processShader;	
+	Shader* shadowShader;
+	//Shader* wireFrameShader;
 
 	HeightMap* heightMap;
 	Mesh* quad;
+	Mesh* cube;
+
 	Mesh* building1;
-	Mesh* building2;
+
+
+	/*Mesh* building2;
 	Mesh* building3;
 	Mesh* building4;
-	Mesh* building5;
+	Mesh* building5;*/
 
-	Light* light;
+	Light* lights;
 	Camera* camera;
+	//Camera* camera2;
+	//Camera* camera3;
+	//Camera* camera4;
 
 	GLuint cubeMap;
 
@@ -60,6 +69,7 @@ protected:
 	GLuint pavedTexture;
 
 	GLuint walltexture[3];
+	GLuint blockadeTex;
 
 	GLuint wallBump1;
 
@@ -67,6 +77,15 @@ protected:
 	GLuint processFBO;
 	GLuint bufferColourTex[2];
 	GLuint bufferDepthTex;
+
+	GLuint shadowTex;
+	GLuint shadowFBO;
+
+	GLuint sceneDiffuse;
+	GLuint sceneBump;
+	float sceneTime;
+
+
 
 	GLuint texture;
 
