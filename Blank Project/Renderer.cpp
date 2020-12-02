@@ -41,7 +41,7 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
 
 	earthTex = SOIL_load_OGL_texture(
-		TEXTUREDIR "Purple.jpg", SOIL_LOAD_AUTO,
+		TEXTUREDIR "scraper3.jpg", SOIL_LOAD_AUTO,
 		SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
 
 	earthBump = SOIL_load_OGL_texture(
@@ -69,6 +69,10 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		SetTextureRepeating(walltexture[i], true);
 	}
 	
+	scanlines = SOIL_load_OGL_texture(
+		TEXTUREDIR "scanlines10.jpg", SOIL_LOAD_AUTO,
+		SOIL_CREATE_NEW_ID, 0);
+
 	SetTextureRepeating(blockadeTex, true);
 	SetTextureRepeating(wallBump1, true);
 
@@ -151,7 +155,7 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
-	freeCam = true;
+	freeCam = false;
 	CRT = false;
 	init = true;
 }
@@ -301,20 +305,6 @@ void Renderer::DrawScene()
 	ClearNodeLists();
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-
-	//switchCam();
-	//glBindFramebuffer(GL_FRAMEBUFFER, testFBO);
-	//BuildNodeLists(root);
-	//SortNodeLists();
-	//glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-	//projMatrix = Matrix4::Perspective(1.0f, 15000.0f, (float)width / (float)height, 90.0f);
-	//DrawSkybox();
-	//DrawNodes();
-	//DrawWater();
-	//ClearNodeLists();
-	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	//switchCam();
-
 }
 
 void Renderer::ClearNodeLists()
@@ -437,7 +427,7 @@ void Renderer::placeTerrain()
 
 	currentCamera = camera;
 
-	lights = new Light(heightmapSize * Vector3(1.5, 1.5, 0.5), Vector4(1, 0.75, 1, 1), 10000.0f);
+	lights = new Light(heightmapSize * Vector3(0.9, 1.5, 0.5), Vector4(1, 0.75, 1, 1), 10000.0f);
 
 	//pavement
 	//for (int i = 0; i < 11; i++)
@@ -579,6 +569,10 @@ void Renderer::applyCRT()
 	viewMatrix.ToIdentity();
 	projMatrix.ToIdentity();
 	UpdateShaderMatrices();
+
+	glUniform1i(glGetUniformLocation(CRTprocessShader->GetProgram(), "mixTex"), 3);
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, scanlines);
 
 	glActiveTexture(GL_TEXTURE0);
 	glUniform1i(glGetUniformLocation(CRTprocessShader->GetProgram(), "sceneTex"), 0);

@@ -81,6 +81,7 @@ protected:
 	GLuint blockadeTex;
 
 	GLuint wallBump1;
+	GLuint scanlines;
 
 	GLuint bufferFBO;
 	

@@ -1,6 +1,7 @@
 #version 330 core
 
 uniform sampler2D sceneTex;
+uniform sampler2D mixTex;
 
 in Vertex 
 {
@@ -13,6 +14,8 @@ out vec4 fragColor;
 void main (void) 
 {
 	
+	vec4 mixer = texture (mixTex , IN.texCoord);
+
 	vec2 deltay = dFdy (IN.texCoord);
 	vec2 deltax = dFdx (IN.texCoord);
 
@@ -22,6 +25,6 @@ void main (void)
 
 	vec4 temp = vec4(rValue.r, gValue.g, bValue.b, 1.0);
 
-	fragColor = temp;
+	fragColor = temp + (mixer * 0.06f);
 
 }
