@@ -20,9 +20,15 @@ protected:
 	void DrawSkybox(); 
 	void DrawWater();
 
+	void setTextures();
+	void loadShaders();
+
 	void PresentScene();
 	void DrawPostProcess();
 	void DrawScene();
+
+	void applyCRT();
+	void applyBlur();
 
 	void BuildNodeLists(SceneNode* from);
 	void SortNodeLists();
@@ -36,7 +42,7 @@ protected:
 	Shader* skyboxShader;
 	Shader* reflectShader;
 	Shader* processShader;	
-	Shader* shadowShader;
+	Shader* CRTprocessShader;
 	//Shader* wireFrameShader;
 
 	HeightMap* heightMap;
@@ -53,11 +59,13 @@ protected:
 
 	Light* lights;
 	Camera* camera;
+	Camera* camera2;
 	//Camera* camera2;
 	//Camera* camera3;
 	//Camera* camera4;
 
 	GLuint cubeMap;
+	GLuint othercubeMap;
 
 	GLuint earthTex;
 	GLuint waterTex;
@@ -74,17 +82,14 @@ protected:
 	GLuint wallBump1;
 
 	GLuint bufferFBO;
+	GLuint testFBO;
+
 	GLuint processFBO;
 	GLuint bufferColourTex[2];
 	GLuint bufferDepthTex;
 
 	GLuint shadowTex;
 	GLuint shadowFBO;
-
-	GLuint sceneDiffuse;
-	GLuint sceneBump;
-	float sceneTime;
-
 
 
 	GLuint texture;

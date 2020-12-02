@@ -2,7 +2,7 @@
 #include "Artifact.h"
 #include "../nclgl/CubeRobot.h"
 
-const int POST_PASSES = 0;
+const int POST_PASSES = 3;
 const int NO_SCRAPERS = 60;
 const int NO_ART = 10;
 const int NO_LIGHTS = 5;
@@ -23,17 +23,17 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 
 	sceneShader = new Shader("TexturedVertex.glsl", "TexturedFragment.glsl");
 
+	CRTprocessShader = new Shader("TexturedVertex.glsl", "#COCRTProcess.glsl");
+
 	processShader = new Shader("TexturedVertex.glsl", "processfrag.glsl");
 
 	//wireFrameShader = new Shader("#COwireVertex.glsl", "#COwireFrag.glsl", "#COwireGeometry.glsl");
 
-
-
 	walltexture[0] = SOIL_load_OGL_texture(TEXTUREDIR "scraper.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
 	walltexture[1] = SOIL_load_OGL_texture(TEXTUREDIR "scraper2.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
-	walltexture[2] = SOIL_load_OGL_texture(TEXTUREDIR "scraper3.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
+	walltexture[2] = SOIL_load_OGL_texture(TEXTUREDIR "scraper4.png", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
 
-	blockadeTex = SOIL_load_OGL_texture(TEXTUREDIR "rustyWall.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
+	blockadeTex = SOIL_load_OGL_texture(TEXTUREDIR "Diamond_Plate_ALBEDO.png", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
 
 
 	wallBump1 = SOIL_load_OGL_texture(
@@ -80,13 +80,17 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 
 	SetTextureRepeating(pavedTexture, true);
 
+	othercubeMap = SOIL_load_OGL_cubemap(
+		TEXTUREDIR "rusted_west.jpg", TEXTUREDIR "rusted_east.jpg",
+		TEXTUREDIR "rusted_up.jpg", TEXTUREDIR "rusted_down.jpg",
+		TEXTUREDIR "rusted_south.jpg", TEXTUREDIR "rusted_north.jpg",
+		SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
+
 	cubeMap = SOIL_load_OGL_cubemap(
 		TEXTUREDIR "sunwave_west.jpg", TEXTUREDIR "sunwave_east.jpg",
 		TEXTUREDIR "sunwave_up.jpg", TEXTUREDIR "sunwave_down.jpg",
 		TEXTUREDIR "sunwave_south.jpg", TEXTUREDIR "sunwave_north.jpg",
 		SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
-
-	
 
 	projMatrix = Matrix4::Perspective(1.0f, 15000.0f,(float)width / (float)height, 90.0f);
 
@@ -146,19 +150,20 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 Renderer::~Renderer(void)	
 {
 	delete camera;
+	delete camera2;
 	delete quad;
 	delete cube;
 	delete building1;
 	delete skyboxShader;
 	delete lightShader;
 	delete reflectShader;
-	//delete wireFrameShader;
 
 	delete lights;
 
 	delete heightMap;
 	delete sceneShader;
 	delete processShader;
+	delete CRTprocessShader;
 
 	glDeleteTextures(2, bufferColourTex);
 	glDeleteTextures(1, &bufferDepthTex);
@@ -170,7 +175,7 @@ Renderer::~Renderer(void)
 void Renderer::UpdateScene(float dt) 
 {
 	camera->UpdateCamera(dt);
-	//camera->
+
 	viewMatrix = camera->BuildViewMatrix();
 	frameFrustum.FromMatrix(projMatrix * viewMatrix);
 
@@ -232,17 +237,13 @@ void Renderer::RenderScene()
 void Renderer::DrawScene()
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, bufferFBO);
-	
 	BuildNodeLists(root);
 	SortNodeLists();
-	//glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 	projMatrix = Matrix4::Perspective(1.0f, 15000.0f, (float)width / (float)height, 90.0f);
 	DrawSkybox();
 	DrawNodes();
 	DrawWater();
-
-
 	ClearNodeLists();
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -271,49 +272,73 @@ void Renderer::DrawNode(SceneNode* n)
 	if (n->GetShader())
 	{	
 		BindShader(n->GetShader());
-		SetShaderLight(lights[0]);
+		SetShaderLight(*lights);
 		UpdateShaderMatrices();
 		
 	}
 
 	if (n->GetMesh())
 	{
-	
-
-		glUniform3fv(glGetUniformLocation(lightShader->GetProgram(),
-			"cameraPos"), 1, (float*)&camera->GetPosition());
-
-		glUniform1i(glGetUniformLocation(n->GetShader()->GetProgram(), "diffuseTex"), 0);
-
-		texture = n->GetTexture();
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, texture);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-
-		Matrix4 model = n->GetWorldTransform() * Matrix4::Scale(n->GetModelScale());
-		glUniformMatrix4fv(glGetUniformLocation(n->GetShader()->GetProgram(), "modelMatrix"), 1, false, model.values);
-
-		//glUniform4fv(glGetUniformLocation(n->GetShader()->GetProgram(), "nodeColour"), 1, (float*)&n->GetColour());
-
-
-
-
-		if (n->GetBumpTexture())
+		if (n->GetShader() == reflectShader)
 		{
+
+			glUniform3fv(glGetUniformLocation(n->GetShader()->GetProgram(),
+				"cameraPos"), 1, (float*)&camera->GetPosition());
+
 			glUniform1i(glGetUniformLocation(
-				n->GetShader()->GetProgram(), "bumpTex"), 1);
-			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_2D, n->GetBumpTexture());
+				n->GetShader()->GetProgram(), "diffuseTex"), 0);
+			glUniform1i(glGetUniformLocation(
+				n->GetShader()->GetProgram(), "cubeTex"), 2);
+
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, n->GetTexture());
+
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, othercubeMap);
+
+
+			glUniform3fv(glGetUniformLocation(n->GetShader()->GetProgram(),
+				"cameraPos"), 1, (float*)&camera->GetPosition());
+
+			Matrix4 model = n->GetWorldTransform() * Matrix4::Scale(n->GetModelScale());
+			glUniformMatrix4fv(glGetUniformLocation(n->GetShader()->GetProgram(), "modelMatrix"), 
+																				1, false, model.values);
+			//UpdateShaderMatrices();
+			SetShaderLight(*lights);
+
+			n->Draw(*this);
 		}
+		else
+		{
+			glUniform1i(glGetUniformLocation(n->GetShader()->GetProgram(), "diffuseTex"), 0);
 
-		glUniform1i(glGetUniformLocation(n->GetShader()->GetProgram(), "useTexture"), texture);
+			texture = n->GetTexture();
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, texture);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-		modelMatrix.ToIdentity();
-		textureMatrix.ToIdentity();
+			Matrix4 model = n->GetWorldTransform() * Matrix4::Scale(n->GetModelScale());
+			glUniformMatrix4fv(glGetUniformLocation(n->GetShader()->GetProgram(), "modelMatrix"), 1, false, model.values);
 
-		n->Draw(*this);
+			if (n->GetBumpTexture())
+			{
+				glUniform1i(glGetUniformLocation(
+					n->GetShader()->GetProgram(), "bumpTex"), 1);
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_2D, n->GetBumpTexture());
+			}
+
+			//glUniform1i(glGetUniformLocation(n->GetShader()->GetProgram(), "useTexture"), texture);
+			glUniform3fv(glGetUniformLocation(n->GetShader()->GetProgram(),
+				"cameraPos"), 1, (float*)&camera->GetPosition());
+
+			modelMatrix.ToIdentity();
+			textureMatrix.ToIdentity();
+
+			n->Draw(*this);
+
+		}
 
 	}
 
@@ -324,29 +349,21 @@ void Renderer::placeTerrain()
 
 	root = new SceneNode();
 	root->SetShader(NULL);
-	//root->SetBoundingRadius(10000.0f);
-
 	SceneNode* Scenery = new SceneNode(heightMap, Vector4(1, 0, 1, 1));
-
+	Vector3 heightmapSize = heightMap->GetHeightmapSize();
+	
 	float terrainsize = heightMap->GetHeightmapSize().Length() * 5.0f;
 	Scenery->SetTexture(earthTex);
 	Scenery->SetBumpTexture(earthBump);
 	Scenery->SetShader(lightShader);
 	Scenery->SetBoundingRadius(terrainsize);
 
-	//SceneNode* WireScenery = new SceneNode(heightMap, Vector4(1, 0, 1, 1));
-	//WireScenery->SetTexture(earthTex);
-	//WireScenery->SetBumpTexture(earthBump);
-	//WireScenery->SetShader(lightShader);
-	//WireScenery->SetBoundingRadius(terrainsize);
-	Vector3 heightmapSize = heightMap->GetHeightmapSize();
-	
 	camera = new Camera(0, -90.f, heightmapSize * Vector3(0.05, 0.5f, 0.5));
 
-	//lights = new Light[NO_LIGHTS];
+	camera2 = new Camera(0, 90.f, heightmapSize * Vector3(0.95, 0.5f, 0.5));
 
 	lights = new Light(Vector3(0, 0, 100.0f), Vector4(1, 0.75, 1, 1), 1000.0f);
-	lights->SetPosition(heightmapSize * Vector3(0.1, 0.2, 0.5));
+	lights->SetPosition(heightmapSize * Vector3(0.5, 0.5, 0.5));
 
 	//road
 	for (int i = 0; i < 11; i++)
@@ -363,7 +380,6 @@ void Renderer::placeTerrain()
 		s->SetBoundingRadius(5000.0f);
 		Scenery->AddChild(s);
 	}
-
 	//pavement
 	for (int i = 0; i < 11; i++)
 	{
@@ -393,16 +409,17 @@ void Renderer::placeTerrain()
 		root->AddChild(r);
 	}
 
-	SceneNode* tunnel = new SceneNode(building1, Vector4(1, 1, 1, 1));
-	tunnel->SetModelScale(Vector3(120.0f, 120.0f, 50.0f));
+	SceneNode* portal = new SceneNode(building1, Vector4(1, 1, 1, 1));
+	portal->SetModelScale(Vector3(160.0f, 120.0f, 3.0f));
 
-	tunnel->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0, 0, 0.5)));
-	tunnel->SetTransform(tunnel->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-	tunnel->SetTexture(earthTex);
-	tunnel->SetBumpTexture(earthBump);
-	tunnel->SetShader(lightShader);
-	tunnel->SetBoundingRadius(10000.0f);
-	root->AddChild(tunnel);
+	portal->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0.94, 0.05, 0.5)));
+	portal->SetTransform(portal->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+	portal->SetTexture(waterTex);
+	portal->SetBumpTexture(earthBump);
+	portal->SetShader(reflectShader);
+	portal->SetBoundingRadius(10000.0f);
+
+	root->AddChild(portal);
 
 	for (int i = 0; i < NO_ART; i++)
 	{
@@ -412,10 +429,9 @@ void Renderer::placeTerrain()
 		float z = -0.5 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 1.5));
 		s->SetTransform(Matrix4::Translation(heightmapSize * Vector3(x, y, z)));
 		s->SetShader(NULL);
-		s->setCube(building1, earthTex, lightShader);
+		s->setCube(building1, earthTex, reflectShader);
 		Scenery->AddChild(s);
 	}
-
 
 	for (int i = 0; i < NO_SCRAPERS; i++)
 	{
@@ -430,6 +446,7 @@ void Renderer::placeTerrain()
 		root->AddChild(r);
 
 	}
+
 	for (int i = 0; i < NO_SCRAPERS; i++)
 	{
 		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
@@ -443,6 +460,7 @@ void Renderer::placeTerrain()
 		root->AddChild(r);
 
 	}
+
 	for (int i = 0; i < NO_SCRAPERS; i++)
 	{
 		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
@@ -456,8 +474,8 @@ void Renderer::placeTerrain()
 		root->AddChild(r);
 
 	}
-	root->AddChild(Scenery);
 
+	root->AddChild(Scenery);
 }
 
 void Renderer::DrawPostProcess()
@@ -467,18 +485,56 @@ void Renderer::DrawPostProcess()
 		GL_TEXTURE_2D, bufferColourTex[1], 0);
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
+	glDisable(GL_DEPTH_TEST);
+
+	applyCRT();
+	applyBlur();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glEnable(GL_DEPTH_TEST);
+}
+
+void Renderer::applyCRT()
+{
+
+	BindShader(CRTprocessShader);
+	modelMatrix.ToIdentity();
+	viewMatrix.ToIdentity();
+	projMatrix.ToIdentity();
+	UpdateShaderMatrices();
+
+	glActiveTexture(GL_TEXTURE0);
+	glUniform1i(glGetUniformLocation(CRTprocessShader->GetProgram(), "sceneTex"), 0);
+
+	for (int i = 0; i < 3; ++i)
+	{
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
+		glUniform1i(glGetUniformLocation(CRTprocessShader->GetProgram(), "isVertical"), 0);
+
+		glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
+		quad->Draw();
+		 //Now to swap the colour buffers , and do the second blur pass
+		glUniform1i(glGetUniformLocation(CRTprocessShader->GetProgram(), "isVertical"), 1);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+			GL_TEXTURE_2D, bufferColourTex[0], 0);
+		glBindTexture(GL_TEXTURE_2D, bufferColourTex[1]);
+		quad->Draw();
+	}
+
+}
+
+void Renderer::applyBlur()
+{
 	BindShader(processShader);
 	modelMatrix.ToIdentity();
 	viewMatrix.ToIdentity();
 	projMatrix.ToIdentity();
 	UpdateShaderMatrices();
 
-	glDisable(GL_DEPTH_TEST);
-
 	glActiveTexture(GL_TEXTURE0);
 	glUniform1i(glGetUniformLocation(processShader->GetProgram(), "sceneTex"), 0);
 
-	for (int i = 0; i < POST_PASSES; ++i)
+	for (int i = 0; i < 1; ++i)
 	{
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
 		glUniform1i(glGetUniformLocation(processShader->GetProgram(), "isVertical"), 0);
@@ -492,8 +548,7 @@ void Renderer::DrawPostProcess()
 		glBindTexture(GL_TEXTURE_2D, bufferColourTex[1]);
 		quad->Draw();
 	}
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glEnable(GL_DEPTH_TEST);
+
 }
 
 void Renderer::PresentScene()
@@ -541,5 +596,4 @@ void Renderer::DrawWater()
 	UpdateShaderMatrices();
 	SetShaderLight(*lights);
 	quad->Draw();
-
 }

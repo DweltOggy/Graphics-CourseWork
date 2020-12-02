@@ -33,5 +33,5 @@ void main (void)
 		vec2 offset = delta * (i - 3);
 		vec4 tmp = texture2D (sceneTex , IN.texCoord.xy + offset );
 		fragColor += tmp * scaleFactors [i];
-	 }
+	}
  }
