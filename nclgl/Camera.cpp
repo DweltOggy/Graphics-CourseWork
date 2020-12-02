@@ -24,7 +24,6 @@ void Camera::UpdateCamera(float dt)
 	Vector3 forward = rotation * Vector3(0, 0, -1);
 	Vector3 right = rotation * Vector3(1, 0, 0);
 	
-	float speed = 30.0f * dt;
 
 	if (Window::GetKeyboard() -> KeyDown(KEYBOARD_W)) 
 		 position += forward * velocity;
@@ -45,9 +44,28 @@ void Camera::UpdateCamera(float dt)
 		 position.y -= velocity;
 		
 	
-	
 }
 
+void Camera::ForwardCamera(float dt)
+{
+	velocity = 8.0;
+	Matrix4 rotation = Matrix4::Rotation(yaw, Vector3(0, 1, 0));
+	Vector3 forward = rotation * Vector3(0, 0, -1);
+	position += forward * velocity;
+}
+
+void Camera::UpCamera(float dt)
+{
+	velocity = 1.1;
+	position.y += velocity;
+}
+
+void Camera::RotateCamera(float dt)
+{
+	yaw -= 0.5;
+	//Matrix4 rotation = Matrix4::Rotation(yaw, Vector3(0, 1, 0));
+	//Vector3 forward = rotation * Vector3(0, 0, -1);
+}
 	
 
 

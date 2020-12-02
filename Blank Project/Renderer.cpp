@@ -5,7 +5,7 @@
 const int POST_PASSES = 3;
 const int NO_SCRAPERS = 60;
 const int NO_ART = 10;
-const int NO_LIGHTS = 5;
+const int LIGHTS_NUM = 5;
 
 Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 {
@@ -144,13 +144,14 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
+	freeCam = false;
+	CRT = false;
 	init = true;
 }
 
 Renderer::~Renderer(void)	
 {
 	delete camera;
-	delete camera2;
 	delete quad;
 	delete cube;
 	delete building1;
@@ -174,12 +175,44 @@ Renderer::~Renderer(void)
 
 void Renderer::UpdateScene(float dt) 
 {
-	camera->UpdateCamera(dt);
+	if (freeCam)
+		camera->UpdateCamera(dt);
+	else
+		moveCamera(dt);
+
 
 	viewMatrix = camera->BuildViewMatrix();
 	frameFrustum.FromMatrix(projMatrix * viewMatrix);
 
 	root->Update(dt);
+}
+
+void Renderer::moveCamera(float dt)
+{
+	Vector3 heightmapSize = heightMap->GetHeightmapSize();
+
+	if(camera->GetPosition().x < heightmapSize.x * 0.8)
+		camera->ForwardCamera(dt);
+	else if (camera->GetPosition().y < heightmapSize.y * 2.0)
+	{
+		camera->RotateCamera(dt);
+		camera->UpCamera(dt);
+	}
+
+}
+
+void Renderer::setFreeCam()
+{
+	Vector3 heightmapSize = heightMap->GetHeightmapSize();
+
+	freeCam = !freeCam;
+	if (!freeCam)
+	{
+		camera->SetPosition(heightmapSize * Vector3(0.05, 0.5, 0.5));
+		camera->SetYaw(-90.0f);
+		camera->SetPitch(0);
+	}
+	
 }
 
 void Renderer::BuildNodeLists(SceneNode* from)
@@ -287,6 +320,10 @@ void Renderer::DrawNode(SceneNode* n)
 
 			glUniform1i(glGetUniformLocation(
 				n->GetShader()->GetProgram(), "diffuseTex"), 0);
+
+			glUniform1i(glGetUniformLocation(
+				n->GetShader()->GetProgram(), "perfect"), true);
+
 			glUniform1i(glGetUniformLocation(
 				n->GetShader()->GetProgram(), "cubeTex"), 2);
 
@@ -360,17 +397,14 @@ void Renderer::placeTerrain()
 
 	camera = new Camera(0, -90.f, heightmapSize * Vector3(0.05, 0.5f, 0.5));
 
-	camera2 = new Camera(0, 90.f, heightmapSize * Vector3(0.95, 0.5f, 0.5));
+	lights = new Light(heightmapSize * Vector3(0.5, 0.5, 0.5), Vector4(1, 0.75, 1, 1), 1000.0f);
 
-	lights = new Light(Vector3(0, 0, 100.0f), Vector4(1, 0.75, 1, 1), 1000.0f);
-	lights->SetPosition(heightmapSize * Vector3(0.5, 0.5, 0.5));
 
 	//road
 	for (int i = 0; i < 11; i++)
 	{
-		SceneNode* s = new SceneNode(quad, Vector4(1, 1, 1, 1));
-		s->SetModelScale(Vector3(120.0f, 300.0f, 200.0f));
-		s->SetTransform(Matrix4::Translation(Vector3(0, 1.01, 0.1)));
+		SceneNode* s = new SceneNode(building1, Vector4(1, 1, 1, 1));
+		s->SetModelScale(Vector3(200.0f, 300.0f, 10.0f));
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
 		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0.07, 0 + 0.09 * i)));
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
@@ -381,20 +415,20 @@ void Renderer::placeTerrain()
 		Scenery->AddChild(s);
 	}
 	//pavement
-	for (int i = 0; i < 11; i++)
-	{
-		SceneNode* s = new SceneNode(quad, Vector4(1, 1, 1, 1));
-		s->SetModelScale(Vector3(150.0f, 300.0f, 100.0f));
-		s->SetTransform(Matrix4::Translation(Vector3(0.5, 0.95, 0.1)));
-		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0.069, 0 + 0.09 * i)));
-		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
-		s->SetTexture(pavedTexture);
-		s->SetBumpTexture(NULL);
-		s->SetShader(lightShader);
-		s->SetBoundingRadius(10000.0f);
-		Scenery->AddChild(s);
-	}
+	//for (int i = 0; i < 11; i++)
+	//{
+	//	SceneNode* s = new SceneNode(quad, Vector4(1, 1, 1, 1));
+	//	s->SetModelScale(Vector3(150.0f, 300.0f, 100.0f));
+	//	s->SetTransform(Matrix4::Translation(Vector3(0.5, 0.95, 0.1)));
+	//	s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+	//	s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0.069, 0 + 0.09 * i)));
+	//	s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
+	//	s->SetTexture(pavedTexture);
+	//	s->SetBumpTexture(NULL);
+	//	s->SetShader(lightShader);
+	//	s->SetBoundingRadius(10000.0f);
+	//	Scenery->AddChild(s);
+	//}
 
 	for (int i = 0; i < 10; i++)
 	{
@@ -486,9 +520,12 @@ void Renderer::DrawPostProcess()
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
 	glDisable(GL_DEPTH_TEST);
+	if (CRT)
+	{
+		applyCRT();
+		applyBlur();
+	}
 
-	applyCRT();
-	applyBlur();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glEnable(GL_DEPTH_TEST);
@@ -575,6 +612,10 @@ void Renderer::DrawWater()
 
 	glUniform1i(glGetUniformLocation(
 		reflectShader->GetProgram(), "diffuseTex"), 0);
+
+	glUniform1i(glGetUniformLocation(
+		reflectShader->GetProgram(), "perfect"), false);
+
 	glUniform1i(glGetUniformLocation(
 		reflectShader->GetProgram(), "cubeTex"), 2);
 

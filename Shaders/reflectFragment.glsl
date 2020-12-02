@@ -4,6 +4,7 @@ uniform sampler2D diffuseTex;
 uniform samplerCube cubeTex;
 
 uniform vec3 cameraPos;
+uniform bool perfect;
 
 in Vertex 
 {
@@ -22,6 +23,13 @@ void main (void)
 
 	vec3 reflectDir = reflect (- viewDir , normalize (IN.normal));
 	vec4 reflectTex = texture (cubeTex, reflectDir);
-
-	fragColour = reflectTex + (diffuse * 0.25f);
+	if (perfect)
+	{
+		fragColour = reflectTex; 
+	}
+	else
+	{
+		fragColour = reflectTex + (diffuse * 0.25f);
+	}
+	
 }

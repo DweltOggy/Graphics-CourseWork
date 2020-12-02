@@ -25,6 +25,10 @@ public:
 	~Camera(void) {};
 	
 	void UpdateCamera(float dt = 1.0f);
+
+	void ForwardCamera(float dt);
+	void UpCamera(float dt);
+	void RotateCamera(float dt);
 	
 	Matrix4 BuildViewMatrix();
 	

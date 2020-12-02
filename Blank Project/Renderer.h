@@ -10,10 +10,11 @@ class Renderer : public OGLRenderer
 public:
 	Renderer(Window &parent);
 	 ~Renderer(void);
-	 void RenderScene()				override;
-	 void UpdateScene(float msec)	override;
+	void RenderScene()				override;
+	void UpdateScene(float msec)	override;
 	
-
+	void setCRT() { CRT = !CRT; };
+	void setFreeCam();
 
 protected:
 	void placeTerrain();
@@ -37,6 +38,11 @@ protected:
 	void DrawNodes();
 	void DrawNode(SceneNode* n);
 
+	void moveCamera(float dt);
+
+	bool freeCam;
+	bool CRT;
+
 	Shader* lightShader;
 	Shader* sceneShader;
 	Shader* skyboxShader;
@@ -51,19 +57,10 @@ protected:
 
 	Mesh* building1;
 
-
-	/*Mesh* building2;
-	Mesh* building3;
-	Mesh* building4;
-	Mesh* building5;*/
-
 	Light* lights;
-	Camera* camera;
-	Camera* camera2;
-	//Camera* camera2;
-	//Camera* camera3;
-	//Camera* camera4;
 
+	Camera* camera;
+	
 	GLuint cubeMap;
 	GLuint othercubeMap;
 
@@ -82,7 +79,7 @@ protected:
 	GLuint wallBump1;
 
 	GLuint bufferFBO;
-	GLuint testFBO;
+	//GLuint testFBO;
 
 	GLuint processFBO;
 	GLuint bufferColourTex[2];
@@ -90,7 +87,6 @@ protected:
 
 	GLuint shadowTex;
 	GLuint shadowFBO;
-
 
 	GLuint texture;
 

@@ -28,6 +28,16 @@ int main()	{
 		{
 			Shader::ReloadAllShaders();
 		}
+
+		if (Window::GetKeyboard()->KeyDown(KEYBOARD_P))
+		{
+			renderer.setCRT();
+		}
+
+		if (Window::GetKeyboard()->KeyDown(KEYBOARD_O))
+		{
+			renderer.setFreeCam();
+		}
 	}
 	return 0;
 }
