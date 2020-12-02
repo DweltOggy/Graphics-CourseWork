@@ -38,6 +38,11 @@ int main()	{
 		{
 			renderer.setFreeCam();
 		}
+
+		if (Window::GetKeyboard()->KeyDown(KEYBOARD_M))
+		{
+			renderer.switchCam();
+		}
 	}
 	return 0;
 }

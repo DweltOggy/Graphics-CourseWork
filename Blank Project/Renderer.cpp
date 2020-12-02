@@ -4,7 +4,7 @@
 
 const int POST_PASSES = 3;
 const int NO_SCRAPERS = 60;
-const int NO_ART = 10;
+const int NO_ART = 15;
 const int LIGHTS_NUM = 5;
 
 Renderer::Renderer(Window& parent) : OGLRenderer(parent)
@@ -13,7 +13,7 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 	heightMap = new HeightMap(TEXTUREDIR "noise12.png");
 
 	building1 = Mesh::LoadFromMeshFile("OffsetCubeY.msh");
-	cube = Mesh::LoadFromMeshFile("Cube.msh");
+	cube = Mesh::LoadFromMeshFile("building.msh");
 
 	skyboxShader = new Shader("skyboxVertex.glsl", "skyboxFragment.glsl");
 
@@ -92,7 +92,7 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		TEXTUREDIR "sunwave_south.jpg", TEXTUREDIR "sunwave_north.jpg",
 		SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
 
-	projMatrix = Matrix4::Perspective(1.0f, 15000.0f,(float)width / (float)height, 90.0f);
+	//projMatrix = Matrix4::Perspective(1.0f, 15000.0f,(float)width / (float)height, 90.0f);
 
 	placeTerrain();
 
@@ -121,7 +121,11 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 	}
 
 	glGenFramebuffers(1, &bufferFBO); 
+
+	glGenFramebuffers(1, &testFBO);
+
 	glGenFramebuffers(1, &processFBO); 
+
 
 	glBindFramebuffer(GL_FRAMEBUFFER, bufferFBO);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
@@ -130,6 +134,9 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		GL_TEXTURE_2D, bufferDepthTex, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
 		GL_TEXTURE_2D, bufferColourTex[0], 0);
+
+
+
 
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE || !bufferDepthTex || !bufferColourTex[0])
 	{
@@ -144,7 +151,7 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
-	freeCam = false;
+	freeCam = true;
 	CRT = false;
 	init = true;
 }
@@ -152,6 +159,8 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 Renderer::~Renderer(void)	
 {
 	delete camera;
+	delete camera2;
+
 	delete quad;
 	delete cube;
 	delete building1;
@@ -168,20 +177,20 @@ Renderer::~Renderer(void)
 
 	glDeleteTextures(2, bufferColourTex);
 	glDeleteTextures(1, &bufferDepthTex);
-	glDeleteFramebuffers(1, &bufferFBO);
-	glDeleteFramebuffers(1, &processFBO);
 
+	glDeleteFramebuffers(1, &bufferFBO);
+	glDeleteFramebuffers(1, &testFBO);
+	glDeleteFramebuffers(1, &processFBO);
 }
 
 void Renderer::UpdateScene(float dt) 
 {
 	if (freeCam)
-		camera->UpdateCamera(dt);
+		currentCamera->UpdateCamera(dt);
 	else
 		moveCamera(dt);
 
-
-	viewMatrix = camera->BuildViewMatrix();
+	viewMatrix = currentCamera->BuildViewMatrix();
 	frameFrustum.FromMatrix(projMatrix * viewMatrix);
 
 	root->Update(dt);
@@ -191,12 +200,12 @@ void Renderer::moveCamera(float dt)
 {
 	Vector3 heightmapSize = heightMap->GetHeightmapSize();
 
-	if(camera->GetPosition().x < heightmapSize.x * 0.8)
-		camera->ForwardCamera(dt);
-	else if (camera->GetPosition().y < heightmapSize.y * 2.0)
+	if(currentCamera->GetPosition().x < heightmapSize.x * 0.8)
+		currentCamera->ForwardCamera(dt);
+	else if (currentCamera->GetPosition().y < heightmapSize.y * 2.0)
 	{
-		camera->RotateCamera(dt);
-		camera->UpCamera(dt);
+		currentCamera->RotateCamera(dt);
+		currentCamera->UpCamera(dt);
 	}
 
 }
@@ -208,11 +217,23 @@ void Renderer::setFreeCam()
 	freeCam = !freeCam;
 	if (!freeCam)
 	{
-		camera->SetPosition(heightmapSize * Vector3(0.05, 0.5, 0.5));
-		camera->SetYaw(-90.0f);
-		camera->SetPitch(0);
+		currentCamera->SetPosition(heightmapSize * Vector3(0.05, 0.5, 0.5));
+		currentCamera->SetYaw(-90.0f);
+		currentCamera->SetPitch(0);
 	}
 	
+}
+
+void Renderer::switchCam()
+{
+	if (currentCamera == camera)
+	{
+		currentCamera = camera2;
+	}
+	else if (currentCamera == camera2)
+	{
+		currentCamera = camera;
+	}
 }
 
 void Renderer::BuildNodeLists(SceneNode* from)
@@ -279,6 +300,21 @@ void Renderer::DrawScene()
 	DrawWater();
 	ClearNodeLists();
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+	//switchCam();
+	//glBindFramebuffer(GL_FRAMEBUFFER, testFBO);
+	//BuildNodeLists(root);
+	//SortNodeLists();
+	//glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+	//projMatrix = Matrix4::Perspective(1.0f, 15000.0f, (float)width / (float)height, 90.0f);
+	//DrawSkybox();
+	//DrawNodes();
+	//DrawWater();
+	//ClearNodeLists();
+	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	//switchCam();
+
 }
 
 void Renderer::ClearNodeLists()
@@ -335,7 +371,7 @@ void Renderer::DrawNode(SceneNode* n)
 
 
 			glUniform3fv(glGetUniformLocation(n->GetShader()->GetProgram(),
-				"cameraPos"), 1, (float*)&camera->GetPosition());
+				"cameraPos"), 1, (float*)&currentCamera->GetPosition());
 
 			Matrix4 model = n->GetWorldTransform() * Matrix4::Scale(n->GetModelScale());
 			glUniformMatrix4fv(glGetUniformLocation(n->GetShader()->GetProgram(), "modelMatrix"), 
@@ -368,7 +404,7 @@ void Renderer::DrawNode(SceneNode* n)
 
 			//glUniform1i(glGetUniformLocation(n->GetShader()->GetProgram(), "useTexture"), texture);
 			glUniform3fv(glGetUniformLocation(n->GetShader()->GetProgram(),
-				"cameraPos"), 1, (float*)&camera->GetPosition());
+				"cameraPos"), 1, (float*)&currentCamera->GetPosition());
 
 			modelMatrix.ToIdentity();
 			textureMatrix.ToIdentity();
@@ -395,25 +431,14 @@ void Renderer::placeTerrain()
 	Scenery->SetShader(lightShader);
 	Scenery->SetBoundingRadius(terrainsize);
 
-	camera = new Camera(0, -90.f, heightmapSize * Vector3(0.05, 0.5f, 0.5));
+	camera = new Camera(0, -90.f, heightmapSize * Vector3(0.05, 0.5, 0.5));
 
-	lights = new Light(heightmapSize * Vector3(0.5, 0.5, 0.5), Vector4(1, 0.75, 1, 1), 1000.0f);
+	camera2 = new Camera(0, 90.f, heightmapSize * Vector3(0.8, 0.5, 0.5));
 
+	currentCamera = camera;
 
-	//road
-	for (int i = 0; i < 11; i++)
-	{
-		SceneNode* s = new SceneNode(building1, Vector4(1, 1, 1, 1));
-		s->SetModelScale(Vector3(200.0f, 300.0f, 10.0f));
-		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0.07, 0 + 0.09 * i)));
-		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
-		s->SetTexture(roadTexture);
-		s->SetBumpTexture(roadBump);
-		s->SetShader(lightShader);
-		s->SetBoundingRadius(5000.0f);
-		Scenery->AddChild(s);
-	}
+	lights = new Light(heightmapSize * Vector3(1.5, 1.5, 0.5), Vector4(1, 0.75, 1, 1), 10000.0f);
+
 	//pavement
 	//for (int i = 0; i < 11; i++)
 	//{
@@ -430,6 +455,33 @@ void Renderer::placeTerrain()
 	//	Scenery->AddChild(s);
 	//}
 
+	SceneNode* portal = new SceneNode(building1, Vector4(1, 1, 1, 1));
+	portal->SetModelScale(Vector3(160.0f, 120.0f, 3.0f));
+
+	portal->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0.94, 0.05, 0.5)));
+	portal->SetTransform(portal->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+	portal->SetTexture(waterTex);
+	portal->SetBumpTexture(earthBump);
+	portal->SetShader(reflectShader);
+	portal->SetBoundingRadius(10000.0f);
+
+	root->AddChild(portal);
+
+//road
+	for (int i = 0; i < 11; i++)
+	{
+		SceneNode* s = new SceneNode(building1, Vector4(1, 1, 1, 1));
+		s->SetModelScale(Vector3(200.0f, 300.0f, 10.0f));
+		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0.07, 0 + 0.09 * i)));
+		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
+		s->SetTexture(roadTexture);
+		s->SetBumpTexture(roadBump);
+		s->SetShader(lightShader);
+		s->SetBoundingRadius(5000.0f);
+		Scenery->AddChild(s);
+	}
+
 	for (int i = 0; i < 10; i++)
 	{
 		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
@@ -442,18 +494,6 @@ void Renderer::placeTerrain()
 		r->SetBoundingRadius(10000.0f);
 		root->AddChild(r);
 	}
-
-	SceneNode* portal = new SceneNode(building1, Vector4(1, 1, 1, 1));
-	portal->SetModelScale(Vector3(160.0f, 120.0f, 3.0f));
-
-	portal->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0.94, 0.05, 0.5)));
-	portal->SetTransform(portal->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-	portal->SetTexture(waterTex);
-	portal->SetBumpTexture(earthBump);
-	portal->SetShader(reflectShader);
-	portal->SetBoundingRadius(10000.0f);
-
-	root->AddChild(portal);
 
 	for (int i = 0; i < NO_ART; i++)
 	{
@@ -543,17 +583,16 @@ void Renderer::applyCRT()
 	glActiveTexture(GL_TEXTURE0);
 	glUniform1i(glGetUniformLocation(CRTprocessShader->GetProgram(), "sceneTex"), 0);
 
-	for (int i = 0; i < 3; ++i)
+
+	for (int i = 0; i < 2; ++i)
 	{
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
-		glUniform1i(glGetUniformLocation(CRTprocessShader->GetProgram(), "isVertical"), 0);
-
+	
 		glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
 		quad->Draw();
+
 		 //Now to swap the colour buffers , and do the second blur pass
-		glUniform1i(glGetUniformLocation(CRTprocessShader->GetProgram(), "isVertical"), 1);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-			GL_TEXTURE_2D, bufferColourTex[0], 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D, bufferColourTex[0], 0);
 		glBindTexture(GL_TEXTURE_2D, bufferColourTex[1]);
 		quad->Draw();
 	}
@@ -592,6 +631,7 @@ void Renderer::PresentScene()
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
 	BindShader(sceneShader);
 	modelMatrix.ToIdentity();
 	viewMatrix.ToIdentity();
@@ -600,6 +640,7 @@ void Renderer::PresentScene()
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
 	glUniform1i(glGetUniformLocation(sceneShader->GetProgram(), "diffuseTex"), 0);
+
 	quad->Draw();
 }
 
@@ -608,7 +649,7 @@ void Renderer::DrawWater()
 	BindShader(reflectShader);
 
 	glUniform3fv(glGetUniformLocation(reflectShader->GetProgram(),
-		"cameraPos"), 1, (float*)&camera->GetPosition());
+		"cameraPos"), 1, (float*)&currentCamera->GetPosition());
 
 	glUniform1i(glGetUniformLocation(
 		reflectShader->GetProgram(), "diffuseTex"), 0);
@@ -628,11 +669,6 @@ void Renderer::DrawWater()
 
 	modelMatrix =
 		Matrix4::Translation(hSize * Vector3(1, 0.01, 0.5)) *Matrix4::Scale(hSize * 0.5f) *Matrix4::Rotation(90, Vector3(1, 0, 0));
-
-	/*textureMatrix =
-		Matrix4::Translation(Vector3(waterCycle, 0.0f, waterCycle)) *
-		Matrix4::Scale(Vector3(10, 10, 10)) *
-		Matrix4::Rotation(waterRotate, Vector3(0, 0, 1));*/
 
 	UpdateShaderMatrices();
 	SetShaderLight(*lights);

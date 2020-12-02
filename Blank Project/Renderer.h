@@ -14,6 +14,7 @@ public:
 	void UpdateScene(float msec)	override;
 	
 	void setCRT() { CRT = !CRT; };
+	void switchCam();
 	void setFreeCam();
 
 protected:
@@ -59,7 +60,10 @@ protected:
 
 	Light* lights;
 
+	Camera*  currentCamera;
+
 	Camera* camera;
+	Camera* camera2;
 	
 	GLuint cubeMap;
 	GLuint othercubeMap;
@@ -79,11 +83,14 @@ protected:
 	GLuint wallBump1;
 
 	GLuint bufferFBO;
-	//GLuint testFBO;
-
+	
 	GLuint processFBO;
 	GLuint bufferColourTex[2];
 	GLuint bufferDepthTex;
+	
+	GLuint testFBO;
+	GLuint testColourTex[2];
+	GLuint testDepthTex;
 
 	GLuint shadowTex;
 	GLuint shadowFBO;
