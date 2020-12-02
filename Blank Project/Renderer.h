@@ -14,6 +14,7 @@ public:
 	void UpdateScene(float msec)	override;
 	
 	void setCRT() { CRT = !CRT; };
+	void toggleFreeCam() { freeCam = !freeCam; };
 	void switchCam();
 	void setFreeCam();
 

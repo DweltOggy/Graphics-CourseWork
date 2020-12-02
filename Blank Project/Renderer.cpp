@@ -218,7 +218,7 @@ void Renderer::setFreeCam()
 {
 	Vector3 heightmapSize = heightMap->GetHeightmapSize();
 
-	freeCam = !freeCam;
+	toggleFreeCam();
 	if (!freeCam)
 	{
 		currentCamera->SetPosition(heightmapSize * Vector3(0.05, 0.5, 0.5));
@@ -230,6 +230,7 @@ void Renderer::setFreeCam()
 
 void Renderer::switchCam()
 {
+	freeCam = true;
 	if (currentCamera == camera)
 	{
 		currentCamera = camera2;
@@ -421,9 +422,9 @@ void Renderer::placeTerrain()
 	Scenery->SetShader(lightShader);
 	Scenery->SetBoundingRadius(terrainsize);
 
-	camera = new Camera(0, -90.f, heightmapSize * Vector3(0.05, 0.5, 0.5));
+	camera = new Camera(0, -90.0f, heightmapSize * Vector3(0.05, 0.5, 0.5));
 
-	camera2 = new Camera(0, 90.f, heightmapSize * Vector3(0.8, 0.5, 0.5));
+	camera2 = new Camera(0, 65.0f, heightmapSize * Vector3(0.8, 2.0, 0.9));
 
 	currentCamera = camera;
 
@@ -578,7 +579,7 @@ void Renderer::applyCRT()
 	glUniform1i(glGetUniformLocation(CRTprocessShader->GetProgram(), "sceneTex"), 0);
 
 
-	for (int i = 0; i < 2; ++i)
+	for (int i = 0; i < 3; ++i)
 	{
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
 	

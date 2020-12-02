@@ -48,7 +48,7 @@ void Camera::UpdateCamera(float dt)
 
 void Camera::ForwardCamera(float dt)
 {
-	velocity = 8.0;
+	velocity = 3.0;
 	Matrix4 rotation = Matrix4::Rotation(yaw, Vector3(0, 1, 0));
 	Vector3 forward = rotation * Vector3(0, 0, -1);
 	position += forward * velocity;
