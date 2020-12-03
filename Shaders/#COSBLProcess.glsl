@@ -12,7 +12,7 @@ in Vertex
 out vec4 fragColor ;
 
 const float scaleFactors [3] =
-float []( 1.0 , 100.0 , 1.0);
+float []( 1.0 , 5.0 , 1.0);
 
 void main (void) 
 {
@@ -38,7 +38,7 @@ void main (void)
 
 	for (int i = 0; i < 3; i ++) 
 	{
-		vec2 offset = delta * (i - 1);//+ delta2;
+		vec2 offset = delta * (i - 1);
 		offset += delta2;
 		vec4 tmp = texture2D (sceneTex , IN.texCoord.xy + offset );
 
@@ -48,7 +48,7 @@ void main (void)
 
 	for (int i = 0; i < 3; i ++) 
 	{
-		vec2 offset = delta * (i - 1);// - delta2;
+		vec2 offset = delta * (i - 1);
 		offset -= delta2;
 		vec4 tmp = texture2D (sceneTex , IN.texCoord.xy + offset );
 		fragColor += tmp * (scaleFactors [i] * -(i-1));

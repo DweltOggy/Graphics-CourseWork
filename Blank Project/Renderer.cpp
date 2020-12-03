@@ -4,7 +4,7 @@
 
 const int POST_PASSES = 3;
 const int NO_SCRAPERS = 60;
-const int NO_ART = 15;
+const int NO_ART = 25;
 const int LIGHTS_NUM = 5;
 
 Renderer::Renderer(Window& parent) : OGLRenderer(parent)
@@ -31,7 +31,7 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 
 	processShader = new Shader("TexturedVertex.glsl", "processfrag.glsl");
 	 
-	//wireFrameShader = new Shader("#COwireVertex.glsl", "#COwireFrag.glsl", "#COwireGeometry.glsl");
+	wireFrameShader = new Shader("#COwireVertex.glsl", "#COwireFrag.glsl");
 
 	walltexture[0] = SOIL_load_OGL_texture(TEXTUREDIR "scraper.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
 	walltexture[1] = SOIL_load_OGL_texture(TEXTUREDIR "scraper2.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
@@ -184,6 +184,7 @@ Renderer::~Renderer(void)
 	delete CRTprocessShader;
 	delete SBLprocessShader;
 	delete GreyScaleShader;
+	delete wireFrameShader;
 
 	delete lights;
 
@@ -382,7 +383,7 @@ void Renderer::DrawNode(SceneNode* n)
 
 			n->Draw(*this);
 		}
-		else
+		else if(n->GetShader() == lightShader)
 		{
 			glUniform1i(glGetUniformLocation(n->GetShader()->GetProgram(), "diffuseTex"), 0);
 
@@ -403,15 +404,20 @@ void Renderer::DrawNode(SceneNode* n)
 				glBindTexture(GL_TEXTURE_2D, n->GetBumpTexture());
 			}
 
-			//glUniform1i(glGetUniformLocation(n->GetShader()->GetProgram(), "useTexture"), texture);
 			glUniform3fv(glGetUniformLocation(n->GetShader()->GetProgram(),
 				"cameraPos"), 1, (float*)&currentCamera->GetPosition());
 
-			modelMatrix.ToIdentity();
-			textureMatrix.ToIdentity();
+			//modelMatrix.ToIdentity();
+			//textureMatrix.ToIdentity();
 
 			n->Draw(*this);
 
+		}
+		else //if (n->GetShader() == wireFrameShader)
+		{
+			glEnable(GL_LINE_SMOOTH);
+			n->GetColour();
+			n->Draw(*this);
 		}
 
 	}
@@ -423,13 +429,11 @@ void Renderer::placeTerrain()
 
 	root = new SceneNode();
 	root->SetShader(NULL);
+
 	SceneNode* Scenery = new SceneNode(heightMap, Vector4(1, 0, 1, 1));
 	Vector3 heightmapSize = heightMap->GetHeightmapSize();
-	
 	float terrainsize = heightMap->GetHeightmapSize().Length() * 5.0f;
-	Scenery->SetTexture(earthTex);
-	Scenery->SetBumpTexture(earthBump);
-	Scenery->SetShader(lightShader);
+	Scenery->SetShader(wireFrameShader);
 	Scenery->SetBoundingRadius(terrainsize);
 
 	camera = new Camera(0, -90.0f, heightmapSize * Vector3(0.05, 0.5, 0.5));
@@ -453,6 +457,19 @@ void Renderer::placeTerrain()
 	portal->SetBoundingRadius(10000.0f);
 
 	root->AddChild(portal);
+
+	SceneNode* tunnel = new SceneNode(building1, Vector4(1, 1, 1, 1));
+	tunnel->SetModelScale(Vector3(200.0f, 175.0f, 50.0f));
+
+	tunnel->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0.01, 0.05, 0.5)));
+	tunnel->SetTransform(tunnel->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+	tunnel->SetTexture(waterTex);
+	tunnel->SetBumpTexture(earthBump);
+	tunnel->SetShader(reflectShader);
+	tunnel->SetBoundingRadius(10000.0f);
+
+	root->AddChild(tunnel);
+
 
 //road
 	for (int i = 0; i < 11; i++)
@@ -549,14 +566,10 @@ void Renderer::DrawPostProcess()
 	glDisable(GL_DEPTH_TEST);
 
 	if (grey)
-	{
 		applyGrey();
-	}
-
+	
 	if (SBL)
-	{
 		applySBL();
-	}
 	
 	if (CRT)
 	{
@@ -608,22 +621,16 @@ void Renderer::applySBL()
 
 	glActiveTexture(GL_TEXTURE0);
 	glUniform1i(glGetUniformLocation(SBLprocessShader->GetProgram(), "sceneTex"), 0);
-
-	for (int i = 0; i < 2; ++i)
-	{
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
-		glUniform1i(glGetUniformLocation(SBLprocessShader->GetProgram(), "isVertical"), 0);
-		glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
-		quad->Draw();
-
-
-		// Now to swap the colour buffers , and do the second blur pass   
-		glUniform1i(glGetUniformLocation(SBLprocessShader->GetProgram(), "isVertical"), 1);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-			GL_TEXTURE_2D, bufferColourTex[0], 0);
-		glBindTexture(GL_TEXTURE_2D, bufferColourTex[1]);
-		quad->Draw();
-	}
+	
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
+	glUniform1i(glGetUniformLocation(SBLprocessShader->GetProgram(), "isVertical"), 0);
+	glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
+	quad->Draw();
+ 
+	glUniform1i(glGetUniformLocation(SBLprocessShader->GetProgram(), "isVertical"), 1);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D, bufferColourTex[0], 0);
+	glBindTexture(GL_TEXTURE_2D, bufferColourTex[1]);
+	quad->Draw();
 
 }
 
@@ -660,7 +667,7 @@ void Renderer::applyBlur()
 	glActiveTexture(GL_TEXTURE0);
 	glUniform1i(glGetUniformLocation(processShader->GetProgram(), "sceneTex"), 0);
 
-	for (int i = 0; i < 2; ++i)
+	for (int i = 0; i < 1; ++i)
 	{
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
 		glUniform1i(glGetUniformLocation(processShader->GetProgram(), "isVertical"), 0);

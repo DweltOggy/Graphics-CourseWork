@@ -18,11 +18,13 @@ void main (void)
 {
 	mat4 mvp = projMatrix * viewMatrix * modelMatrix;
 
-	gl_Position = mvp * vec4 (position , 1.0);
-	OUT.worldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+	vec4 worldPos = ( modelMatrix * vec4 ( position ,1));
+
+	OUT.worldPos = worldPos.xyz ;
+
 	OUT.colour = colour;
 
+	gl_Position = ( projMatrix * viewMatrix ) * worldPos;
 
-	//OUT.texCoord = (textureMatrix * vec4 (texCoord , 0.0 , 1.0)).xy;
 }
 

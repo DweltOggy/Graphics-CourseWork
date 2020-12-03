@@ -59,7 +59,7 @@ protected:
 	Shader* CRTprocessShader;
 	Shader* SBLprocessShader;
 	Shader* GreyScaleShader;
-	//Shader* wireFrameShader;
+	Shader* wireFrameShader;
 
 	HeightMap* heightMap;
 	Mesh* quad;
