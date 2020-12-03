@@ -25,8 +25,12 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 
 	CRTprocessShader = new Shader("TexturedVertex.glsl", "#COCRTProcess.glsl");
 
-	processShader = new Shader("TexturedVertex.glsl", "processfrag.glsl");
+	SBLprocessShader = new Shader("TexturedVertex.glsl", "#COSBLProcess.glsl");
 
+	GreyScaleShader = new Shader("TexturedVertex.glsl", "#COGRYProcess.glsl");
+
+	processShader = new Shader("TexturedVertex.glsl", "processfrag.glsl");
+	 
 	//wireFrameShader = new Shader("#COwireVertex.glsl", "#COwireFrag.glsl", "#COwireGeometry.glsl");
 
 	walltexture[0] = SOIL_load_OGL_texture(TEXTUREDIR "scraper.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
@@ -157,6 +161,9 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 
 	freeCam = false;
 	CRT = false;
+	SBL = false;
+	grey = false;
+
 	init = true;
 }
 
@@ -168,16 +175,19 @@ Renderer::~Renderer(void)
 	delete quad;
 	delete cube;
 	delete building1;
+
 	delete skyboxShader;
 	delete lightShader;
 	delete reflectShader;
+	delete sceneShader;
+	delete processShader;
+	delete CRTprocessShader;
+	delete SBLprocessShader;
+	delete GreyScaleShader;
 
 	delete lights;
 
 	delete heightMap;
-	delete sceneShader;
-	delete processShader;
-	delete CRTprocessShader;
 
 	glDeleteTextures(2, bufferColourTex);
 	glDeleteTextures(1, &bufferDepthTex);
@@ -430,21 +440,7 @@ void Renderer::placeTerrain()
 
 	lights = new Light(heightmapSize * Vector3(0.9, 1.5, 0.5), Vector4(1, 0.75, 1, 1), 10000.0f);
 
-	//pavement
-	//for (int i = 0; i < 11; i++)
-	//{
-	//	SceneNode* s = new SceneNode(quad, Vector4(1, 1, 1, 1));
-	//	s->SetModelScale(Vector3(150.0f, 300.0f, 100.0f));
-	//	s->SetTransform(Matrix4::Translation(Vector3(0.5, 0.95, 0.1)));
-	//	s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-	//	s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0.069, 0 + 0.09 * i)));
-	//	s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
-	//	s->SetTexture(pavedTexture);
-	//	s->SetBumpTexture(NULL);
-	//	s->SetShader(lightShader);
-	//	s->SetBoundingRadius(10000.0f);
-	//	Scenery->AddChild(s);
-	//}
+
 
 	SceneNode* portal = new SceneNode(building1, Vector4(1, 1, 1, 1));
 	portal->SetModelScale(Vector3(160.0f, 120.0f, 3.0f));
@@ -551,6 +547,17 @@ void Renderer::DrawPostProcess()
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
 	glDisable(GL_DEPTH_TEST);
+
+	if (grey)
+	{
+		applyGrey();
+	}
+
+	if (SBL)
+	{
+		applySBL();
+	}
+	
 	if (CRT)
 	{
 		applyCRT();
@@ -574,23 +581,71 @@ void Renderer::applyCRT()
 	glUniform1i(glGetUniformLocation(CRTprocessShader->GetProgram(), "mixTex"), 3);
 	glActiveTexture(GL_TEXTURE3);
 	glBindTexture(GL_TEXTURE_2D, scanlines);
-
 	glActiveTexture(GL_TEXTURE0);
 	glUniform1i(glGetUniformLocation(CRTprocessShader->GetProgram(), "sceneTex"), 0);
-
 
 	for (int i = 0; i < 3; ++i)
 	{
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
-	
 		glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
 		quad->Draw();
 
-		 //Now to swap the colour buffers , and do the second blur pass
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D, bufferColourTex[0], 0);
 		glBindTexture(GL_TEXTURE_2D, bufferColourTex[1]);
 		quad->Draw();
 	}
+
+}
+
+void Renderer::applySBL()
+{
+
+	BindShader(SBLprocessShader);
+	modelMatrix.ToIdentity();
+	viewMatrix.ToIdentity();
+	projMatrix.ToIdentity();
+	UpdateShaderMatrices();
+
+	glActiveTexture(GL_TEXTURE0);
+	glUniform1i(glGetUniformLocation(SBLprocessShader->GetProgram(), "sceneTex"), 0);
+
+	for (int i = 0; i < 2; ++i)
+	{
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
+		glUniform1i(glGetUniformLocation(SBLprocessShader->GetProgram(), "isVertical"), 0);
+		glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
+		quad->Draw();
+
+
+		// Now to swap the colour buffers , and do the second blur pass   
+		glUniform1i(glGetUniformLocation(SBLprocessShader->GetProgram(), "isVertical"), 1);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+			GL_TEXTURE_2D, bufferColourTex[0], 0);
+		glBindTexture(GL_TEXTURE_2D, bufferColourTex[1]);
+		quad->Draw();
+	}
+
+}
+
+void Renderer::applyGrey()
+{
+	BindShader(GreyScaleShader);
+	modelMatrix.ToIdentity();
+	viewMatrix.ToIdentity();
+	projMatrix.ToIdentity();
+	UpdateShaderMatrices();
+	glActiveTexture(GL_TEXTURE0);
+	glUniform1i(glGetUniformLocation(SBLprocessShader->GetProgram(), "sceneTex"), 0);
+
+	
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
+	glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
+	quad->Draw();
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D, bufferColourTex[0], 0);
+	glBindTexture(GL_TEXTURE_2D, bufferColourTex[1]);
+
+	quad->Draw();
 
 }
 
@@ -605,11 +660,10 @@ void Renderer::applyBlur()
 	glActiveTexture(GL_TEXTURE0);
 	glUniform1i(glGetUniformLocation(processShader->GetProgram(), "sceneTex"), 0);
 
-	for (int i = 0; i < 1; ++i)
+	for (int i = 0; i < 2; ++i)
 	{
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
 		glUniform1i(glGetUniformLocation(processShader->GetProgram(), "isVertical"), 0);
-
 		glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
 		quad->Draw();
 		// Now to swap the colour buffers , and do the second blur pass

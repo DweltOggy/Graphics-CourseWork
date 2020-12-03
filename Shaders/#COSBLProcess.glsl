@@ -9,35 +9,49 @@ in Vertex
 	vec2 texCoord;
 }IN ;
 
-out vec4 fragColor;
+out vec4 fragColor ;
 
-const int xdirectionL[3] = int[](-1, -2, -1);
-const int xdirectionR[3] = int[](1, 2, 1);
-
-const int ydirectionU[3] = int[](-1, -2, -1);
-const int ydirectionD[3] = int[](1, 2, 1);
+const float scaleFactors [3] =
+float []( 1.0 , 100.0 , 1.0);
 
 void main (void) 
 {
-	fragColor = vec4 (0 ,0 ,0 ,1);
+
+	fragColor = texture2D (sceneTex , IN.texCoord);
+
 	vec2 delta = vec2 (0 ,0);
+	vec2 delta2 = vec2 (0 ,0);
+
+	vec4 tempColour;
 
 	if(isVertical == 1) 
 	{
 		delta = dFdx (IN.texCoord);
-		//delta.y = 1;
+		delta2 = dFdy (IN.texCoord);
 	}
 	else 
 	{
+
 		delta = dFdy (IN.texCoord);
-		//delta.x = 1;
+		delta2 = dFdx (IN.texCoord);
 	}
 
-	for (int i = 0; i < 7; i ++) 
+	for (int i = 0; i < 3; i ++) 
 	{
-		//vec2 offset = delta * (i - 3);
-		//vec4 tmp = texture2D (sceneTex , IN.texCoord.xy + offset );
-		//fragColor += tmp * scaleFactors [i];
+		vec2 offset = delta * (i - 1);//+ delta2;
+		offset += delta2;
+		vec4 tmp = texture2D (sceneTex , IN.texCoord.xy + offset );
+
+
+		fragColor += tmp * (scaleFactors [i] * -(i -1));
+	}
+
+	for (int i = 0; i < 3; i ++) 
+	{
+		vec2 offset = delta * (i - 1);// - delta2;
+		offset -= delta2;
+		vec4 tmp = texture2D (sceneTex , IN.texCoord.xy + offset );
+		fragColor += tmp * (scaleFactors [i] * -(i-1));
 	}
 
 }

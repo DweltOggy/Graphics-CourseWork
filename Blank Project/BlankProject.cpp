@@ -36,6 +36,17 @@ int main()	{
 
 		if (Window::GetKeyboard()->KeyDown(KEYBOARD_O))
 		{
+			renderer.setSBL();
+		}
+
+		if (Window::GetKeyboard()->KeyDown(KEYBOARD_I))
+		{
+			renderer.setGrey();
+		}
+
+
+		if (Window::GetKeyboard()->KeyDown(KEYBOARD_N))
+		{
 			renderer.setFreeCam();
 		}
 

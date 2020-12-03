@@ -14,6 +14,8 @@ public:
 	void UpdateScene(float msec)	override;
 	
 	void setCRT() { CRT = !CRT; };
+	void setGrey() { grey = !grey; };
+	void setSBL() { SBL = !SBL; };
 	void toggleFreeCam() { freeCam = !freeCam; };
 	void switchCam();
 	void setFreeCam();
@@ -31,7 +33,9 @@ protected:
 	void DrawScene();
 
 	void applyCRT();
+	void applySBL();
 	void applyBlur();
+	void applyGrey();
 
 	void BuildNodeLists(SceneNode* from);
 	void SortNodeLists();
@@ -44,6 +48,8 @@ protected:
 
 	bool freeCam;
 	bool CRT;
+	bool SBL;
+	bool grey;
 
 	Shader* lightShader;
 	Shader* sceneShader;
@@ -51,6 +57,8 @@ protected:
 	Shader* reflectShader;
 	Shader* processShader;	
 	Shader* CRTprocessShader;
+	Shader* SBLprocessShader;
+	Shader* GreyScaleShader;
 	//Shader* wireFrameShader;
 
 	HeightMap* heightMap;

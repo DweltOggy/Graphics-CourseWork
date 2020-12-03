@@ -52,12 +52,15 @@ void Camera::ForwardCamera(float dt)
 	Matrix4 rotation = Matrix4::Rotation(yaw, Vector3(0, 1, 0));
 	Vector3 forward = rotation * Vector3(0, 0, -1);
 	position += forward * velocity;
+
+	velocity = 8.0;
 }
 
 void Camera::UpCamera(float dt)
 {
 	velocity = 1.1;
 	position.y += velocity;
+	velocity = 8.0;
 }
 
 void Camera::RotateCamera(float dt)
