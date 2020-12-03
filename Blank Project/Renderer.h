@@ -5,6 +5,11 @@
 #include "../NCLGL/Frustum.h"
 #include "../nclgl/HeightMap.h"
 
+const int POST_PASSES = 3;
+const int NO_SCRAPERS = 60;
+const int NO_ART = 25;
+const int LIGHTS_NUM = 5;
+
 class Renderer : public OGLRenderer	
 {
 public:
@@ -21,9 +26,18 @@ public:
 	void setFreeCam();
 
 protected:
+
+	struct rainDrop
+	{
+		Mesh* mesh;
+		Vector3 position;
+		float velocity;
+	};
+
 	void placeTerrain();
 	void DrawSkybox(); 
 	void DrawWater();
+	
 
 	void setTextures();
 	void loadShaders();
@@ -51,6 +65,11 @@ protected:
 	bool SBL;
 	bool grey;
 
+	float waterRotate;
+	float waterCycle;
+
+	Vector3 heightmapSize;
+
 	Shader* lightShader;
 	Shader* sceneShader;
 	Shader* skyboxShader;
@@ -63,7 +82,7 @@ protected:
 
 	HeightMap* heightMap;
 	Mesh* quad;
-	Mesh* cube;
+	Mesh* streetLamp;
 
 	Mesh* building1;
 

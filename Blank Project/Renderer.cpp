@@ -2,18 +2,13 @@
 #include "Artifact.h"
 #include "../nclgl/CubeRobot.h"
 
-const int POST_PASSES = 3;
-const int NO_SCRAPERS = 60;
-const int NO_ART = 25;
-const int LIGHTS_NUM = 5;
-
 Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 {
 	quad = Mesh::GenerateQuad();
 	heightMap = new HeightMap(TEXTUREDIR "noise12.png");
 
 	building1 = Mesh::LoadFromMeshFile("OffsetCubeY.msh");
-	cube = Mesh::LoadFromMeshFile("building.msh");
+	streetLamp = Mesh::LoadFromMeshFile("Street Lamp.msh");
 
 	skyboxShader = new Shader("skyboxVertex.glsl", "skyboxFragment.glsl");
 
@@ -100,8 +95,7 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		TEXTUREDIR "sunwave_south.jpg", TEXTUREDIR "sunwave_north.jpg",
 		SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
 
-	//projMatrix = Matrix4::Perspective(1.0f, 15000.0f,(float)width / (float)height, 90.0f);
-
+	
 	placeTerrain();
 
 	// Generate our scene depth texture ...
@@ -134,7 +128,6 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 
 	glGenFramebuffers(1, &processFBO); 
 
-
 	glBindFramebuffer(GL_FRAMEBUFFER, bufferFBO);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
 		GL_TEXTURE_2D, bufferDepthTex, 0);
@@ -142,8 +135,6 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		GL_TEXTURE_2D, bufferDepthTex, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
 		GL_TEXTURE_2D, bufferColourTex[0], 0);
-
-
 
 
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE || !bufferDepthTex || !bufferColourTex[0])
@@ -164,6 +155,9 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 	SBL = false;
 	grey = false;
 
+	waterRotate = 0.0f;
+	waterCycle = 0.0f;
+
 	init = true;
 }
 
@@ -173,7 +167,7 @@ Renderer::~Renderer(void)
 	delete camera2;
 
 	delete quad;
-	delete cube;
+	delete streetLamp;
 	delete building1;
 
 	delete skyboxShader;
@@ -431,7 +425,7 @@ void Renderer::placeTerrain()
 	root->SetShader(NULL);
 
 	SceneNode* Scenery = new SceneNode(heightMap, Vector4(1, 0, 1, 1));
-	Vector3 heightmapSize = heightMap->GetHeightmapSize();
+	heightmapSize = heightMap->GetHeightmapSize();
 	float terrainsize = heightMap->GetHeightmapSize().Length() * 5.0f;
 	Scenery->SetShader(wireFrameShader);
 	Scenery->SetBoundingRadius(terrainsize);
@@ -443,8 +437,6 @@ void Renderer::placeTerrain()
 	currentCamera = camera;
 
 	lights = new Light(heightmapSize * Vector3(0.9, 1.5, 0.5), Vector4(1, 0.75, 1, 1), 10000.0f);
-
-
 
 	SceneNode* portal = new SceneNode(building1, Vector4(1, 1, 1, 1));
 	portal->SetModelScale(Vector3(160.0f, 120.0f, 3.0f));
@@ -469,8 +461,7 @@ void Renderer::placeTerrain()
 	tunnel->SetBoundingRadius(10000.0f);
 
 	root->AddChild(tunnel);
-
-
+	//streetLamp
 //road
 	for (int i = 0; i < 11; i++)
 	{
@@ -481,6 +472,35 @@ void Renderer::placeTerrain()
 		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
 		s->SetTexture(roadTexture);
 		s->SetBumpTexture(roadBump);
+		s->SetShader(lightShader);
+		s->SetBoundingRadius(5000.0f);
+		Scenery->AddChild(s);
+	}
+
+	for (int i = 0; i < 11; i++)
+	{
+		SceneNode* s = new SceneNode(streetLamp, Vector4(1, 1, 1, 1));
+		s->SetModelScale(Vector3(0.25f, 0.25f, 0.18f));
+		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.47, 0.07, 0 + 0.09 * i)));
+		//s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
+		s->SetTexture(earthTex);
+		s->SetBumpTexture(earthBump);
+		s->SetShader(lightShader);
+		s->SetBoundingRadius(5000.0f);
+		Scenery->AddChild(s);
+	}
+
+	for (int i = 0; i < 11; i++)
+	{
+		SceneNode* s = new SceneNode(streetLamp, Vector4(1, 1, 1, 1));
+		s->SetModelScale(Vector3(0.25f, 0.25f, 0.18f));
+		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.53, 0.07, 0 + 0.09 * i)));
+		s->SetTransform(s->GetTransform() * Matrix4::Rotation(180.0f, Vector3(0.0, 1.0, 0.0)));
+		//s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
+		s->SetTexture(earthTex);
+		s->SetBumpTexture(earthBump);
 		s->SetShader(lightShader);
 		s->SetBoundingRadius(5000.0f);
 		Scenery->AddChild(s);
@@ -503,7 +523,7 @@ void Renderer::placeTerrain()
 	{
 		Artifact* s = new Artifact();
 		float x = 0.1 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (2.0 - 0.1)));
-		float y = 0.5 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (8.0 - 0.5)));
+		float y = 1.0 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (8.0 - 0.5)));
 		float z = -0.5 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 1.5));
 		s->SetTransform(Matrix4::Translation(heightmapSize * Vector3(x, y, z)));
 		s->SetShader(NULL);
@@ -551,7 +571,7 @@ void Renderer::placeTerrain()
 		r->SetBoundingRadius(10000.0f);
 		root->AddChild(r);
 
-	}
+	}	
 
 	root->AddChild(Scenery);
 }
@@ -724,9 +744,12 @@ void Renderer::DrawWater()
 	Vector3 hSize = heightMap->GetHeightmapSize();
 
 	modelMatrix =
-		Matrix4::Translation(hSize * Vector3(1, 0.01, 0.5)) *Matrix4::Scale(hSize * 0.5f) *Matrix4::Rotation(90, Vector3(1, 0, 0));
+		Matrix4::Translation(hSize * Vector3(1, 0.01, 0.5)) 
+		*Matrix4::Scale(hSize * 0.5f) *Matrix4::Rotation(90, Vector3(1, 0, 0));
 
 	UpdateShaderMatrices();
 	SetShaderLight(*lights);
 	quad->Draw();
 }
+
+

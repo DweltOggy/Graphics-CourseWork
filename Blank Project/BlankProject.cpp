@@ -1,9 +1,10 @@
 #include "../NCLGL/window.h"
 #include "Renderer.h"
+#include <time.h>
 
 int main()	{
 	Window w("Make your own project!", 1920, 1080, false);
-
+	srand(time(NULL));
 	if(!w.HasInitialised()) 
 	{
 		return -1;
