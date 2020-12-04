@@ -70,6 +70,7 @@ protected:
 	Vector3 heightmapSize;
 
 	Shader* lightShader;
+	Shader* bumpShader;
 	Shader* sceneShader;
 	Shader* skyboxShader;
 	Shader* reflectShader;
@@ -102,15 +103,10 @@ protected:
 	GLuint waterTex;
 	GLuint earthBump;
 
-	
-
 	GLuint roadTexture;
 	GLuint roadBump;
 
-	GLuint pavedTexture;
-
 	GLuint walltexture[3];
-	GLuint blockadeTex;
 
 	GLuint wallBump1;
 	GLuint scanlines;

@@ -3,7 +3,7 @@
 #include <time.h>
 
 int main()	{
-	Window w("Make your own project!", 1920, 1080, false);
+	Window w("CSC8502 Christopher Oghoetuoma c0062213", 1920, 1080, true);
 	srand(time(NULL));
 	if(!w.HasInitialised()) 
 	{

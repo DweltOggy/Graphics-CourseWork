@@ -8,7 +8,7 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		TEXTUREDIR "Barren Reds.JPG", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
 
 	bumpmap = SOIL_load_OGL_texture( // Add this line !
-		TEXTUREDIR " Barren RedsDOT3 .JPG ", SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
+		TEXTUREDIR "Barren RedsDOT3.JPG ", SOIL_LOAD_AUTO,SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
 
 	//shader = new Shader("PerPixelVertex.glsl", "PerPixelFragment.glsl");
 	shader = new Shader("BumpVertex.glsl", "BumpFragment.glsl ");

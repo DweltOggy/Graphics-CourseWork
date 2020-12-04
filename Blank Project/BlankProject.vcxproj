@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8274D442-89CD-4AC2-AA8E-A9FA621452ED}</ProjectGuid>
     <RootNamespace>Tutorial1</RootNamespace>
-    <ProjectName>Blank Project</ProjectName>
+    <ProjectName>Coursework Proj</ProjectName>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -137,7 +137,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Artifact.cpp" />
-    <ClCompile Include="BlankProject.cpp" />
+    <ClCompile Include="courseework.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="Soldier.cpp" />
   </ItemGroup>

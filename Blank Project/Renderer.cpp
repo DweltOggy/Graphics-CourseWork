@@ -19,6 +19,8 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 
 	lightShader = new Shader("PerPixelVertex.glsl", "PerPixelFragment.glsl");
 
+	bumpShader = new Shader("BumpVertex.glsl", "BumpFragment.glsl");
+
 	sceneShader = new Shader("TexturedVertex.glsl", "TexturedFragment.glsl");
 
 	CRTprocessShader = new Shader("TexturedVertex.glsl", "#COCRTProcess.glsl");
@@ -36,11 +38,12 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 	skinningShader = new Shader("SkinningVertex.glsl", "texturedFragment.glsl");
 
 
-	walltexture[0] = SOIL_load_OGL_texture(TEXTUREDIR "scraper.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
-	walltexture[1] = SOIL_load_OGL_texture(TEXTUREDIR "scraper2.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
-	walltexture[2] = SOIL_load_OGL_texture(TEXTUREDIR "scraper4.png", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
-
-	blockadeTex = SOIL_load_OGL_texture(TEXTUREDIR "Diamond_Plate_ALBEDO.png", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
+	walltexture[0] = SOIL_load_OGL_texture(TEXTUREDIR "scraper.jpg", 
+		SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
+	walltexture[1] = SOIL_load_OGL_texture(TEXTUREDIR "scraper2.jpg", 
+		SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
+	walltexture[2] = SOIL_load_OGL_texture(TEXTUREDIR "scraper4.png", 
+		SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
 
 
 	wallBump1 = SOIL_load_OGL_texture(
@@ -60,11 +63,7 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
 
 	roadBump = SOIL_load_OGL_texture(
-		TEXTUREDIR "ScraperBump2.png", SOIL_LOAD_AUTO,
-		SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
-
-	pavedTexture = SOIL_load_OGL_texture(
-		TEXTUREDIR "sidewalk.png", SOIL_LOAD_AUTO,
+		TEXTUREDIR "ashphaltBump.png", SOIL_LOAD_AUTO,
 		SOIL_CREATE_NEW_ID, SOIL_FLAG_MIPMAPS);
 
 	waterTex = SOIL_load_OGL_texture(
@@ -80,7 +79,6 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		TEXTUREDIR "scanlines10.jpg", SOIL_LOAD_AUTO,
 		SOIL_CREATE_NEW_ID, 0);
 
-	SetTextureRepeating(blockadeTex, true);
 	SetTextureRepeating(wallBump1, true);
 
 	SetTextureRepeating(earthTex, true);
@@ -89,7 +87,6 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 	SetTextureRepeating(roadTexture, true);
 	SetTextureRepeating(roadBump, true);
 
-	SetTextureRepeating(pavedTexture, true);
 
 	othercubeMap = SOIL_load_OGL_cubemap(
 		TEXTUREDIR "rusted_west.jpg", TEXTUREDIR "rusted_east.jpg",
@@ -102,8 +99,6 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		TEXTUREDIR "sunwave_up.jpg", TEXTUREDIR "sunwave_down.jpg",
 		TEXTUREDIR "sunwave_south.jpg", TEXTUREDIR "sunwave_north.jpg",
 		SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 1);
-
-	
 
 	placeTerrain();
 
@@ -152,8 +147,8 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	//glEnable(GL_CULL_FACE);
-	//glCullFace(GL_BACK);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -183,6 +178,7 @@ Renderer::~Renderer(void)
 
 	delete skyboxShader;
 	delete lightShader;
+	delete bumpShader;
 	delete reflectShader;
 	delete sceneShader;
 	delete processShader;
@@ -205,6 +201,163 @@ Renderer::~Renderer(void)
 	glDeleteFramebuffers(1, &bufferFBO);
 	glDeleteFramebuffers(1, &testFBO);
 	glDeleteFramebuffers(1, &processFBO);
+}
+
+void Renderer::placeTerrain()
+{
+
+	root = new SceneNode();
+	root->SetShader(NULL);
+
+	SceneNode* Scenery = new SceneNode(heightMap, Vector4(1, 0, 1, 0.8));
+	heightmapSize = heightMap->GetHeightmapSize();
+	float terrainsize = heightMap->GetHeightmapSize().Length() * 5.0f;
+	Scenery->SetShader(wireFrameShader);
+	Scenery->SetBoundingRadius(terrainsize);
+
+	theSoldier = new Soldier();
+	theSoldier->setPos(heightmapSize * Vector3(0.5, 0.5, 0.5));
+
+	camera = new Camera(0, -90.0f, heightmapSize * Vector3(0.05, 0.5, 0.5));
+
+	camera2 = new Camera(0, 65.0f, heightmapSize * Vector3(0.8, 2.0, 0.9));
+
+	currentCamera = camera;
+
+	lights = new Light(heightmapSize * Vector3(0.9, 1.5, 0.5), Vector4(1, 0.75, 1, 1), 10000.0f);
+
+	SceneNode* portal = new SceneNode(building1, Vector4(1, 1, 1, 1));
+	portal->SetModelScale(Vector3(160.0f, 120.0f, 3.0f));
+
+	portal->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0.94, 0.05, 0.5)));
+	portal->SetTransform(portal->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+	portal->SetTexture(waterTex);
+	portal->SetShader(reflectShader);
+	portal->SetBoundingRadius(10000.0f);
+
+	root->AddChild(portal);
+
+	SceneNode* tunnel = new SceneNode(building1, Vector4(1, 1, 1, 1));
+	tunnel->SetModelScale(Vector3(200.0f, 175.0f, 50.0f));
+
+	tunnel->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0.01, 0.05, 0.5)));
+	tunnel->SetTransform(tunnel->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+	tunnel->SetTexture(roadTexture);
+	tunnel->SetShader(reflectShader);
+	tunnel->SetBoundingRadius(10000.0f);
+
+	root->AddChild(tunnel);
+
+	SceneNode* bumpBuilding = new SceneNode(building1, Vector4(1, 1, 1, 1));
+	bumpBuilding->SetModelScale(Vector3(100.0f, 100.0f, 100.0f));
+	bumpBuilding->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0.8, 0.2, 1.1)));
+	bumpBuilding->SetTexture(walltexture[1]);
+	bumpBuilding->SetBumpTexture(wallBump1);
+	bumpBuilding->SetShader(lightShader);
+	bumpBuilding->SetBoundingRadius(10000.0f);
+
+	root->AddChild(bumpBuilding);
+	//streetLamp
+//road
+	for (int i = 0; i < 11; i++)
+	{
+		SceneNode* s = new SceneNode(building1, Vector4(1, 1, 1, 1));
+		s->SetModelScale(Vector3(200.0f, 300.0f, 10.0f));
+		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0.07, 0 + 0.09 * i)));
+		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
+		s->SetTexture(roadTexture);
+		s->SetShader(lightShader);
+		s->SetBoundingRadius(5000.0f);
+		Scenery->AddChild(s);
+	}
+
+	for (int i = 0; i < 11; i++)
+	{
+		SceneNode* s = new SceneNode(streetLamp, Vector4(1, 1, 1, 1));
+		s->SetModelScale(Vector3(0.25f, 0.25f, 0.18f));
+		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.47, 0.07, 0 + 0.09 * i)));
+		//s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
+		s->SetTexture(earthTex);
+		s->SetBumpTexture(earthBump);
+		s->SetShader(lightShader);
+		s->SetBoundingRadius(5000.0f);
+		Scenery->AddChild(s);
+	}
+
+	for (int i = 0; i < 11; i++)
+	{
+		SceneNode* s = new SceneNode(streetLamp, Vector4(1, 1, 1, 1));
+		s->SetModelScale(Vector3(0.25f, 0.25f, 0.18f));
+		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
+		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.53, 0.07, 0 + 0.09 * i)));
+		s->SetTransform(s->GetTransform() * Matrix4::Rotation(180.0f, Vector3(0.0, 1.0, 0.0)));
+		//s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
+		s->SetTexture(earthTex);
+		s->SetBumpTexture(earthBump);
+		s->SetShader(lightShader);
+		s->SetBoundingRadius(5000.0f);
+		Scenery->AddChild(s);
+	}
+
+	for (int i = 0; i < 10; i++)
+	{
+		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
+		r->SetModelScale(Vector3(100.0f, 300.0f, 1100.0f));
+		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0, 0, -1 + 0.34 * i)));
+		r->SetTexture(walltexture[1]);
+		r->SetShader(lightShader);
+		r->SetBoundingRadius(10000.0f);
+		root->AddChild(r);
+	}
+
+	for (int i = 0; i < NO_ART; i++)
+	{
+		Artifact* s = new Artifact();
+		float x = 0.1 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (2.0 - 0.1)));
+		float y = 1.0 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (8.0 - 0.5)));
+		float z = -0.5 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 1.5));
+		s->SetTransform(Matrix4::Translation(heightmapSize * Vector3(x, y, z)));
+		s->SetShader(NULL);
+		s->setCube(building1, earthTex, reflectShader);
+		Scenery->AddChild(s);
+	}
+
+	for (int i = 0; i < NO_SCRAPERS; i++)
+	{
+		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
+		r->SetModelScale(Vector3(100.0f, rand() % (int)500 + 300, rand() % (int)50 + 100.0f));
+		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(-0.05 , 0.6, -1 + 0.05 * i )));
+		r->SetTexture(walltexture[rand()% 3]);
+		r->SetShader(lightShader);
+		r->SetBoundingRadius(10000.0f);
+		root->AddChild(r);
+	}
+
+	for (int i = 0; i < NO_SCRAPERS; i++)
+	{
+		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
+		r->SetModelScale(Vector3(100.0f, rand() % (int)500 + 600, rand() % (int)50 + 100.0f));
+		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(-0.2, 0.6, -1 + 0.05 * i)));
+		r->SetTexture(walltexture[rand() % 3]);
+		r->SetShader(lightShader);
+		r->SetBoundingRadius(10000.0f);
+		root->AddChild(r);
+	}
+
+	for (int i = 0; i < NO_SCRAPERS; i++)
+	{
+		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
+		r->SetModelScale(Vector3(100.0f, rand() % (int)500 + 900, rand() % (int)50 + 100.0f));
+		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(-0.4, 0.6, -1 + 0.05 * i)));
+		r->SetTexture(walltexture[rand() % 3]);
+		r->SetShader(lightShader);
+		r->SetBoundingRadius(10000.0f);
+		root->AddChild(r);
+	}	
+
+	root->AddChild(Scenery);
 }
 
 void Renderer::UpdateScene(float dt) 
@@ -303,88 +456,6 @@ void Renderer::DrawNodes()
 	}
 }
 
-void Renderer::SortNodeLists()
-{
-	std::sort(transparentNodeList.rbegin(), transparentNodeList.rend(), SceneNode::CompareByCameraDistance);
-
-	std::sort(nodeList.begin(), nodeList.end(), SceneNode::CompareByCameraDistance);
-}
-
-void Renderer::RenderScene()	
-{
-	DrawScene();
-	DrawPostProcess();
-	PresentScene();
-}
-
-void Renderer::DrawScene()
-{
-	glBindFramebuffer(GL_FRAMEBUFFER, bufferFBO);
-	BuildNodeLists(root);
-	SortNodeLists();
-	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-	projMatrix = Matrix4::Perspective(1.0f, 15000.0f, (float)width / (float)height, 90.0f);
-	DrawSkybox();
-	DrawNodes();
-	DrawWater();
-	DrawSoldier();
-	ClearNodeLists();
-	
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-}
-
-void Renderer::ClearNodeLists()
-{
-	transparentNodeList.clear();
-	nodeList.clear();
-}
-
-void Renderer::DrawSkybox()
-{
-	glDepthMask(GL_FALSE);
-
-	BindShader(skyboxShader);
-	UpdateShaderMatrices();
-
-	quad->Draw();
-
-	glDepthMask(GL_TRUE);
-
-}
-
-void  Renderer::DrawSoldier()
-{
-	//glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-
-	BindShader(skinningShader);
-	glUniform1i(glGetUniformLocation(skinningShader->GetProgram(), "diffuseTex"), 0);
-
-	modelMatrix =
-		Matrix4::Translation(heightmapSize * theSoldier->pos)
-		* Matrix4::Scale(heightmapSize  * 100.0) * Matrix4::Rotation(90, Vector3(1, 0, 0));
-
-	UpdateShaderMatrices();
-	vector <Matrix4> frameMatrices;
-
-	const Matrix4* invBindPose = theSoldier->mesh->GetInverseBindPose();
-	const Matrix4* frameData = theSoldier->anim->GetJointData(currentFrame);
-
-	for (unsigned int i = 0; i < theSoldier->mesh->GetJointCount(); ++i)
-	{
-		frameMatrices.emplace_back(frameData[i] * invBindPose[i]);
-	}
-
-	int j = glGetUniformLocation(skinningShader->GetProgram(), "joints");
-	glUniformMatrix4fv(j, frameMatrices.size(), false, (float*)frameMatrices.data());
-	for (int i = 0; i < theSoldier->mesh->GetSubMeshCount(); ++i)
-	{
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, theSoldier->matTextures[i]);
-		theSoldier->mesh->DrawSubMesh(i);
-	}
-}
-
 void Renderer::DrawNode(SceneNode* n)
 {	
 	if (n->GetShader())
@@ -430,7 +501,13 @@ void Renderer::DrawNode(SceneNode* n)
 
 			n->Draw(*this);
 		}
-		else if(n->GetShader() == lightShader)
+		else if (n->GetShader() == wireFrameShader)
+		{
+			glEnable(GL_LINE_SMOOTH);
+			n->GetColour();
+			n->Draw(*this);
+		}
+		else
 		{
 			glUniform1i(glGetUniformLocation(n->GetShader()->GetProgram(), "diffuseTex"), 0);
 
@@ -443,7 +520,7 @@ void Renderer::DrawNode(SceneNode* n)
 			Matrix4 model = n->GetWorldTransform() * Matrix4::Scale(n->GetModelScale());
 			glUniformMatrix4fv(glGetUniformLocation(n->GetShader()->GetProgram(), "modelMatrix"), 1, false, model.values);
 
-			if (n->GetBumpTexture())
+			if (n->GetShader() == bumpShader)
 			{
 				glUniform1i(glGetUniformLocation(
 					n->GetShader()->GetProgram(), "bumpTex"), 1);
@@ -454,182 +531,49 @@ void Renderer::DrawNode(SceneNode* n)
 			glUniform3fv(glGetUniformLocation(n->GetShader()->GetProgram(),
 				"cameraPos"), 1, (float*)&currentCamera->GetPosition());
 
-			//modelMatrix.ToIdentity();
-			//textureMatrix.ToIdentity();
-
 			n->Draw(*this);
 
-		}
-		else //if (n->GetShader() == wireFrameShader)
-		{
-			glEnable(GL_LINE_SMOOTH);
-			n->GetColour();
-			n->Draw(*this);
 		}
 
 	}
 
 }
 
-void Renderer::placeTerrain()
+void Renderer::SortNodeLists()
 {
+	std::sort(transparentNodeList.rbegin(), transparentNodeList.rend(), SceneNode::CompareByCameraDistance);
 
-	root = new SceneNode();
-	root->SetShader(NULL);
+	std::sort(nodeList.begin(), nodeList.end(), SceneNode::CompareByCameraDistance);
+}
 
-	SceneNode* Scenery = new SceneNode(heightMap, Vector4(1, 0, 1, 0.8));
-	heightmapSize = heightMap->GetHeightmapSize();
-	float terrainsize = heightMap->GetHeightmapSize().Length() * 5.0f;
-	Scenery->SetShader(wireFrameShader);
-	Scenery->SetBoundingRadius(terrainsize);
+void Renderer::ClearNodeLists()
+{
+	transparentNodeList.clear();
+	nodeList.clear();
+}
 
-	theSoldier = new Soldier();
-	theSoldier->setPos(heightmapSize * Vector3(0.5, 0.5, 0.5));
+void Renderer::RenderScene()	
+{
+	DrawScene();
+	DrawPostProcess();
+	PresentScene();
+}
 
-	camera = new Camera(0, -90.0f, heightmapSize * Vector3(0.05, 0.5, 0.5));
+void Renderer::DrawScene()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, bufferFBO);
+	BuildNodeLists(root);
+	SortNodeLists();
+	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+	projMatrix = Matrix4::Perspective(1.0f, 15000.0f, (float)width / (float)height, 90.0f);
+	DrawSkybox();
+	DrawNodes();
+	DrawWater();
+	//DrawSoldier();
+	ClearNodeLists();
+	
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	camera2 = new Camera(0, 65.0f, heightmapSize * Vector3(0.8, 2.0, 0.9));
-
-	currentCamera = camera;
-
-	lights = new Light(heightmapSize * Vector3(0.9, 1.5, 0.5), Vector4(1, 0.75, 1, 1), 10000.0f);
-
-	SceneNode* portal = new SceneNode(building1, Vector4(1, 1, 1, 1));
-	portal->SetModelScale(Vector3(160.0f, 120.0f, 3.0f));
-
-	portal->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0.94, 0.05, 0.5)));
-	portal->SetTransform(portal->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-	portal->SetTexture(waterTex);
-	portal->SetBumpTexture(earthBump);
-	portal->SetShader(reflectShader);
-	portal->SetBoundingRadius(10000.0f);
-
-	root->AddChild(portal);
-
-	SceneNode* tunnel = new SceneNode(building1, Vector4(1, 1, 1, 1));
-	tunnel->SetModelScale(Vector3(200.0f, 175.0f, 50.0f));
-
-	tunnel->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0.01, 0.05, 0.5)));
-	tunnel->SetTransform(tunnel->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-	tunnel->SetTexture(waterTex);
-	tunnel->SetBumpTexture(earthBump);
-	tunnel->SetShader(reflectShader);
-	tunnel->SetBoundingRadius(10000.0f);
-
-	root->AddChild(tunnel);
-	//streetLamp
-//road
-	for (int i = 0; i < 11; i++)
-	{
-		SceneNode* s = new SceneNode(building1, Vector4(1, 1, 1, 1));
-		s->SetModelScale(Vector3(200.0f, 300.0f, 10.0f));
-		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.5, 0.07, 0 + 0.09 * i)));
-		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
-		s->SetTexture(roadTexture);
-		s->SetBumpTexture(roadBump);
-		s->SetShader(lightShader);
-		s->SetBoundingRadius(5000.0f);
-		Scenery->AddChild(s);
-	}
-
-	for (int i = 0; i < 11; i++)
-	{
-		SceneNode* s = new SceneNode(streetLamp, Vector4(1, 1, 1, 1));
-		s->SetModelScale(Vector3(0.25f, 0.25f, 0.18f));
-		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.47, 0.07, 0 + 0.09 * i)));
-		//s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
-		s->SetTexture(earthTex);
-		s->SetBumpTexture(earthBump);
-		s->SetShader(lightShader);
-		s->SetBoundingRadius(5000.0f);
-		Scenery->AddChild(s);
-	}
-
-	for (int i = 0; i < 11; i++)
-	{
-		SceneNode* s = new SceneNode(streetLamp, Vector4(1, 1, 1, 1));
-		s->SetModelScale(Vector3(0.25f, 0.25f, 0.18f));
-		s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(0.0, 1.0, 0.0)));
-		s->SetTransform(s->GetTransform() * Matrix4::Translation(heightmapSize * Vector3(-0.53, 0.07, 0 + 0.09 * i)));
-		s->SetTransform(s->GetTransform() * Matrix4::Rotation(180.0f, Vector3(0.0, 1.0, 0.0)));
-		//s->SetTransform(s->GetTransform() * Matrix4::Rotation(90.0f, Vector3(1.0, 0.0, 0.0)));
-		s->SetTexture(earthTex);
-		s->SetBumpTexture(earthBump);
-		s->SetShader(lightShader);
-		s->SetBoundingRadius(5000.0f);
-		Scenery->AddChild(s);
-	}
-
-	for (int i = 0; i < 10; i++)
-	{
-		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
-		r->SetModelScale(Vector3(100.0f, 300.0f, 1100.0f));
-		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(0, 0, -1 + 0.34 * i)));
-
-		r->SetTexture(walltexture[1]);
-		r->SetBumpTexture(wallBump1);
-		r->SetShader(lightShader);
-		r->SetBoundingRadius(10000.0f);
-		root->AddChild(r);
-	}
-
-	for (int i = 0; i < NO_ART; i++)
-	{
-		Artifact* s = new Artifact();
-		float x = 0.1 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (2.0 - 0.1)));
-		float y = 1.0 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (8.0 - 0.5)));
-		float z = -0.5 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / 1.5));
-		s->SetTransform(Matrix4::Translation(heightmapSize * Vector3(x, y, z)));
-		s->SetShader(NULL);
-		s->setCube(building1, earthTex, reflectShader);
-		Scenery->AddChild(s);
-	}
-
-	for (int i = 0; i < NO_SCRAPERS; i++)
-	{
-		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
-		r->SetModelScale(Vector3(100.0f, rand() % (int)500 + 300, rand() % (int)50 + 100.0f));
-		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(-0.05 , 0.6, -1 + 0.05 * i )));
-		
-		r->SetTexture(walltexture[rand()% 3]);
-		r->SetBumpTexture(wallBump1);
-		r->SetShader(lightShader);
-		r->SetBoundingRadius(10000.0f);
-		root->AddChild(r);
-
-	}
-
-	for (int i = 0; i < NO_SCRAPERS; i++)
-	{
-		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
-		r->SetModelScale(Vector3(100.0f, rand() % (int)500 + 600, rand() % (int)50 + 100.0f));
-		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(-0.2, 0.6, -1 + 0.05 * i)));
-
-		r->SetTexture(walltexture[rand() % 3]);
-		r->SetBumpTexture(wallBump1);
-		r->SetShader(lightShader);
-		r->SetBoundingRadius(10000.0f);
-		root->AddChild(r);
-
-	}
-
-	for (int i = 0; i < NO_SCRAPERS; i++)
-	{
-		SceneNode* r = new SceneNode(building1, Vector4(1, 1, 1, 1));
-		r->SetModelScale(Vector3(100.0f, rand() % (int)500 + 900, rand() % (int)50 + 100.0f));
-		r->SetTransform(Matrix4::Translation(heightmapSize * Vector3(-0.4, 0.6, -1 + 0.05 * i)));
-
-		r->SetTexture(walltexture[rand() % 3]);
-		r->SetBumpTexture(wallBump1);
-		r->SetShader(lightShader);
-		r->SetBoundingRadius(10000.0f);
-		root->AddChild(r);
-
-	}	
-
-	root->AddChild(Scenery);
 }
 
 void Renderer::DrawPostProcess()
@@ -809,6 +753,51 @@ void Renderer::PresentScene()
 	quad->Draw();
 }
 
+void Renderer::DrawSkybox()
+{
+	glDepthMask(GL_FALSE);
+
+	BindShader(skyboxShader);
+	UpdateShaderMatrices();
+
+	quad->Draw();
+
+	glDepthMask(GL_TRUE);
+
+}
+
+void  Renderer::DrawSoldier()
+{
+	//glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+	BindShader(skinningShader);
+	glUniform1i(glGetUniformLocation(skinningShader->GetProgram(), "diffuseTex"), 0);
+
+	modelMatrix =
+		Matrix4::Translation(heightmapSize * theSoldier->pos)
+		* Matrix4::Scale(heightmapSize  * 100.0) * Matrix4::Rotation(90, Vector3(1, 0, 0));
+
+	UpdateShaderMatrices();
+	vector <Matrix4> frameMatrices;
+
+	const Matrix4* invBindPose = theSoldier->mesh->GetInverseBindPose();
+	const Matrix4* frameData = theSoldier->anim->GetJointData(currentFrame);
+
+	for (unsigned int i = 0; i < theSoldier->mesh->GetJointCount(); ++i)
+	{
+		frameMatrices.emplace_back(frameData[i] * invBindPose[i]);
+	}
+
+	int j = glGetUniformLocation(skinningShader->GetProgram(), "joints");
+	glUniformMatrix4fv(j, frameMatrices.size(), false, (float*)frameMatrices.data());
+	for (int i = 0; i < theSoldier->mesh->GetSubMeshCount(); ++i)
+	{
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, theSoldier->matTextures[i]);
+		theSoldier->mesh->DrawSubMesh(i);
+	}
+}
+
 void Renderer::DrawWater()
 {
 	BindShader(reflectShader);
@@ -834,7 +823,8 @@ void Renderer::DrawWater()
 
 	modelMatrix =
 		Matrix4::Translation(hSize * Vector3(1, 0.01, 0.5)) 
-		*Matrix4::Scale(hSize * 0.5f) *Matrix4::Rotation(90, Vector3(1, 0, 0));
+		*Matrix4::Scale(hSize * 0.5f) *Matrix4::Rotation(90, Vector3(1, 0, 0))
+			* Matrix4::Rotation(180, Vector3(1, 0, 0));
 
 	UpdateShaderMatrices();
 	SetShaderLight(*lights);
