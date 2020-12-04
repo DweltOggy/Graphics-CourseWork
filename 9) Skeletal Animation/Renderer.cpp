@@ -72,7 +72,7 @@ void Renderer::RenderScene()
 	
 	UpdateShaderMatrices();
 	
-	vector < Matrix4 > frameMatrices;
+	vector <Matrix4> frameMatrices;
 	
 	const Matrix4 * invBindPose = mesh -> GetInverseBindPose();
 	const Matrix4 * frameData = anim -> GetJointData(currentFrame);

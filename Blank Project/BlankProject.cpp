@@ -45,6 +45,15 @@ int main()	{
 			renderer.setGrey();
 		}
 
+		if (Window::GetKeyboard()->KeyDown(KEYBOARD_U))
+		{
+			renderer.setGamma();
+		}
+
+		if (Window::GetKeyboard()->KeyDown(KEYBOARD_L))
+		{
+			renderer.setBlur();
+		}
 
 		if (Window::GetKeyboard()->KeyDown(KEYBOARD_N))
 		{

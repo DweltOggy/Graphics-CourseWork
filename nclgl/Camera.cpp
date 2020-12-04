@@ -56,6 +56,16 @@ void Camera::ForwardCamera(float dt)
 	velocity = 8.0;
 }
 
+void Camera::BackwardCamera(float dt)
+{
+	velocity = 3.0;
+	Matrix4 rotation = Matrix4::Rotation(yaw, Vector3(0, 1, 0));
+	Vector3 backward = rotation * Vector3(0, 0, 1);
+	position += backward * velocity;
+
+	velocity = 8.0;
+}
+
 void Camera::UpCamera(float dt)
 {
 	velocity = 1.1;
@@ -63,9 +73,16 @@ void Camera::UpCamera(float dt)
 	velocity = 8.0;
 }
 
+void Camera::DownCamera(float dt)
+{
+	velocity = 1.15;
+	position.y -= velocity;
+	velocity = 8.0;
+}
+
 void Camera::RotateCamera(float dt)
 {
-	yaw -= 0.5;
+	yaw -= 0.52;
 	//Matrix4 rotation = Matrix4::Rotation(yaw, Vector3(0, 1, 0));
 	//Vector3 forward = rotation * Vector3(0, 0, -1);
 }

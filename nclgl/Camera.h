@@ -28,6 +28,9 @@ public:
 
 	void ForwardCamera(float dt);
 	void UpCamera(float dt);
+	
+	void DownCamera(float dt);
+	void BackwardCamera(float dt);
 	void RotateCamera(float dt);
 	
 	Matrix4 BuildViewMatrix();

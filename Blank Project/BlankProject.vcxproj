@@ -139,10 +139,12 @@
     <ClCompile Include="Artifact.cpp" />
     <ClCompile Include="BlankProject.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="Soldier.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Artifact.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="Soldier.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

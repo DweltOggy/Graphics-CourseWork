@@ -1,6 +1,9 @@
 #include "Renderer.h"
 #include "Artifact.h"
 #include "../nclgl/CubeRobot.h"
+#include "../nclgl/MeshAnimation.h"
+#include "../nclgl/MeshMaterial.h"
+
 
 Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 {
@@ -27,6 +30,11 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 	processShader = new Shader("TexturedVertex.glsl", "processfrag.glsl");
 	 
 	wireFrameShader = new Shader("#COwireVertex.glsl", "#COwireFrag.glsl");
+
+	gammaShader = new Shader("TexturedVertex.glsl", "#COGMRProcess.glsl");
+
+	skinningShader = new Shader("SkinningVertex.glsl", "texturedFragment.glsl");
+
 
 	walltexture[0] = SOIL_load_OGL_texture(TEXTUREDIR "scraper.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
 	walltexture[1] = SOIL_load_OGL_texture(TEXTUREDIR "scraper2.jpg", SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, 0);
@@ -93,9 +101,10 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 		TEXTUREDIR "sunwave_west.jpg", TEXTUREDIR "sunwave_east.jpg",
 		TEXTUREDIR "sunwave_up.jpg", TEXTUREDIR "sunwave_down.jpg",
 		TEXTUREDIR "sunwave_south.jpg", TEXTUREDIR "sunwave_north.jpg",
-		SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 0);
+		SOIL_LOAD_RGB, SOIL_CREATE_NEW_ID, 1);
 
 	
+
 	placeTerrain();
 
 	// Generate our scene depth texture ...
@@ -154,9 +163,11 @@ Renderer::Renderer(Window& parent) : OGLRenderer(parent)
 	CRT = false;
 	SBL = false;
 	grey = false;
+	gamma = false;
+	blur = false;
 
-	waterRotate = 0.0f;
-	waterCycle = 0.0f;
+	currentFrame = 0;
+	frameTime = 0.0f;
 
 	init = true;
 }
@@ -179,6 +190,10 @@ Renderer::~Renderer(void)
 	delete SBLprocessShader;
 	delete GreyScaleShader;
 	delete wireFrameShader;
+	delete gammaShader;
+	delete skinningShader;
+
+	delete theSoldier;
 
 	delete lights;
 
@@ -202,6 +217,8 @@ void Renderer::UpdateScene(float dt)
 	viewMatrix = currentCamera->BuildViewMatrix();
 	frameFrustum.FromMatrix(projMatrix * viewMatrix);
 
+	theSoldier->update(dt);
+
 	root->Update(dt);
 }
 
@@ -209,9 +226,11 @@ void Renderer::moveCamera(float dt)
 {
 	Vector3 heightmapSize = heightMap->GetHeightmapSize();
 
-	if(currentCamera->GetPosition().x < heightmapSize.x * 0.8)
+	if (currentCamera->GetPosition().x < heightmapSize.x * 0.8 )
+	{
 		currentCamera->ForwardCamera(dt);
-	else if (currentCamera->GetPosition().y < heightmapSize.y * 2.0)
+	}	
+	else if (currentCamera->GetPosition().y < heightmapSize.y * 2.0 )
 	{
 		currentCamera->RotateCamera(dt);
 		currentCamera->UpCamera(dt);
@@ -308,7 +327,9 @@ void Renderer::DrawScene()
 	DrawSkybox();
 	DrawNodes();
 	DrawWater();
+	DrawSoldier();
 	ClearNodeLists();
+	
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 }
@@ -330,6 +351,38 @@ void Renderer::DrawSkybox()
 
 	glDepthMask(GL_TRUE);
 
+}
+
+void  Renderer::DrawSoldier()
+{
+	//glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+	BindShader(skinningShader);
+	glUniform1i(glGetUniformLocation(skinningShader->GetProgram(), "diffuseTex"), 0);
+
+	modelMatrix =
+		Matrix4::Translation(heightmapSize * theSoldier->pos)
+		* Matrix4::Scale(heightmapSize  * 100.0) * Matrix4::Rotation(90, Vector3(1, 0, 0));
+
+	UpdateShaderMatrices();
+	vector <Matrix4> frameMatrices;
+
+	const Matrix4* invBindPose = theSoldier->mesh->GetInverseBindPose();
+	const Matrix4* frameData = theSoldier->anim->GetJointData(currentFrame);
+
+	for (unsigned int i = 0; i < theSoldier->mesh->GetJointCount(); ++i)
+	{
+		frameMatrices.emplace_back(frameData[i] * invBindPose[i]);
+	}
+
+	int j = glGetUniformLocation(skinningShader->GetProgram(), "joints");
+	glUniformMatrix4fv(j, frameMatrices.size(), false, (float*)frameMatrices.data());
+	for (int i = 0; i < theSoldier->mesh->GetSubMeshCount(); ++i)
+	{
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, theSoldier->matTextures[i]);
+		theSoldier->mesh->DrawSubMesh(i);
+	}
 }
 
 void Renderer::DrawNode(SceneNode* n)
@@ -424,11 +477,14 @@ void Renderer::placeTerrain()
 	root = new SceneNode();
 	root->SetShader(NULL);
 
-	SceneNode* Scenery = new SceneNode(heightMap, Vector4(1, 0, 1, 1));
+	SceneNode* Scenery = new SceneNode(heightMap, Vector4(1, 0, 1, 0.8));
 	heightmapSize = heightMap->GetHeightmapSize();
 	float terrainsize = heightMap->GetHeightmapSize().Length() * 5.0f;
 	Scenery->SetShader(wireFrameShader);
 	Scenery->SetBoundingRadius(terrainsize);
+
+	theSoldier = new Soldier();
+	theSoldier->setPos(heightmapSize * Vector3(0.5, 0.5, 0.5));
 
 	camera = new Camera(0, -90.0f, heightmapSize * Vector3(0.05, 0.5, 0.5));
 
@@ -597,6 +653,15 @@ void Renderer::DrawPostProcess()
 		applyBlur();
 	}
 
+	if (gamma)
+	{
+		applyGamma();
+	}
+
+	if (blur)
+	{
+		applyBlur();
+	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glEnable(GL_DEPTH_TEST);
@@ -617,7 +682,7 @@ void Renderer::applyCRT()
 	glActiveTexture(GL_TEXTURE0);
 	glUniform1i(glGetUniformLocation(CRTprocessShader->GetProgram(), "sceneTex"), 0);
 
-	for (int i = 0; i < 3; ++i)
+	for (int i = 0; i < 4; ++i)
 	{
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
 		glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
@@ -662,7 +727,7 @@ void Renderer::applyGrey()
 	projMatrix.ToIdentity();
 	UpdateShaderMatrices();
 	glActiveTexture(GL_TEXTURE0);
-	glUniform1i(glGetUniformLocation(SBLprocessShader->GetProgram(), "sceneTex"), 0);
+	glUniform1i(glGetUniformLocation(GreyScaleShader->GetProgram(), "sceneTex"), 0);
 
 	
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
@@ -670,6 +735,28 @@ void Renderer::applyGrey()
 	quad->Draw();
 
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D, bufferColourTex[0], 0);
+	glBindTexture(GL_TEXTURE_2D, bufferColourTex[1]);
+
+	quad->Draw();
+
+}
+
+void Renderer::applyGamma()
+{
+	BindShader(gammaShader);
+	modelMatrix.ToIdentity();
+	viewMatrix.ToIdentity();
+	projMatrix.ToIdentity();
+	UpdateShaderMatrices();
+	glActiveTexture(GL_TEXTURE0);
+	glUniform1i(glGetUniformLocation(gammaShader->GetProgram(), "sceneTex"), 0);
+
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[1], 0);
+	glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
+	quad->Draw();
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, bufferColourTex[0], 0);
 	glBindTexture(GL_TEXTURE_2D, bufferColourTex[1]);
 
 	quad->Draw();
@@ -712,6 +799,8 @@ void Renderer::PresentScene()
 	modelMatrix.ToIdentity();
 	viewMatrix.ToIdentity();
 	projMatrix.ToIdentity();
+
+
 	UpdateShaderMatrices();
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, bufferColourTex[0]);
